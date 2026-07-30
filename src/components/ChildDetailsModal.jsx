@@ -55,75 +55,98 @@ export default function ChildDetailsModal({ child, parent, voluntarioId, onClose
 
   useEffect(() => {
     const targetChildId = child?.id || child?.filho_id;
-    if (!targetChildId) return;
+    const parentId = child?.responsavel_id || parent?.uid;
 
     const fetchData = async () => {
       setLoading(true);
       try {
-        // 1. Buscar dados completos da criança diretamente do banco
-        let { data: childDb } = await supabase
-          .from('filhos')
-          .select('*')
-          .eq('id', targetChildId)
-          .maybeSingle();
-
-        // 2. Buscar dados do responsável
-        const parentId = childDb?.responsavel_id || child?.responsavel_id || parent?.uid;
+        let childDb = null;
         let parentDb = null;
-        if (parentId) {
-          const { data: pDb } = await supabase
-            .from('usuarios')
-            .select('*')
-            .eq('uid', parentId)
-            .maybeSingle();
 
-          if (pDb) {
-            parentDb = pDb;
-            setFullParent(pDb);
+        // 1. Tentar buscar dados da criança por ID (apenas se for UUID válido)
+        const isUuid = targetChildId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetChildId);
+        if (isUuid) {
+          try {
+            const { data: cData } = await supabase
+              .from('filhos')
+              .select('*')
+              .eq('id', targetChildId)
+              .maybeSingle();
+            if (cData) childDb = cData;
+          } catch (e) {
+            console.log("Busca de filho por ID não retornou registro:", e);
           }
         }
 
-        // Fallback: Se a criança não foi encontrada pelo ID direto, buscar pelo responsavel_id
-        if (!childDb && parentId) {
-          const { data: kidsByParent } = await supabase
-            .from('filhos')
-            .select('*')
-            .eq('responsavel_id', parentId)
-            .limit(1);
+        // 2. Buscar dados do responsável
+        const pId = childDb?.responsavel_id || parentId;
+        if (pId) {
+          try {
+            const { data: pDb } = await supabase
+              .from('usuarios')
+              .select('*')
+              .eq('uid', pId)
+              .maybeSingle();
+            if (pDb) {
+              parentDb = pDb;
+              setFullParent(pDb);
+            }
+          } catch (e) {
+            console.log("Erro ao buscar responsável:", e);
+          }
+        }
 
-          if (kidsByParent && kidsByParent.length > 0) {
-            childDb = kidsByParent[0];
+        // 3. Fallback: Se a criança não foi encontrada pelo ID direto, buscar pelo responsavel_id na tabela 'filhos'
+        if (!childDb && pId) {
+          try {
+            const { data: kidsByParent } = await supabase
+              .from('filhos')
+              .select('*')
+              .eq('responsavel_id', pId)
+              .order('data_cadastro', { ascending: false });
+
+            if (kidsByParent && kidsByParent.length > 0) {
+              // Tentar encontrar por nome se disponível ou usar o primeiro filho cadastrado
+              const matchName = kidsByParent.find(k => child?.nome && k.nome.toLowerCase() === child.nome.toLowerCase());
+              childDb = matchName || kidsByParent[0];
+            }
+          } catch (e) {
+            console.log("Erro ao buscar filho pelo responsavel_id:", e);
           }
         }
 
         if (childDb) {
           setFullChild(childDb);
         } else {
-          // Garantir que fullChild não fique com valores genéricos se conhecemos o responsável
+          // Se não encontrou nenhuma linha na tabela filhos, compor dados legíveis do responsável
           setFullChild(prev => ({
             ...prev,
-            nome: prev?.nome && prev?.nome !== 'Criança' ? prev.nome : (parentDb?.nome ? `Filho(a) de ${parentDb.nome}` : (child?.nome || 'Criança')),
-            selfie: prev?.selfie || parentDb?.selfie || null
+            nome: (prev?.nome && !prev.nome.includes('Filho(a) de') && prev.nome !== 'Criança')
+              ? prev.nome
+              : (parentDb?.nome ? `Filho(a) de ${parentDb.nome}` : (child?.nome || 'Criança')),
+            selfie: prev?.selfie || parentDb?.selfie || null,
+            neurodivergente: prev?.neurodivergente || false,
+            neurodivergencia_detalhe: prev?.neurodivergencia_detalhe || '',
+            como_acalmar: prev?.como_acalmar || '',
+            alergias: prev?.alergias || ''
           }));
         }
 
-        // 3. Buscar estatísticas de presença
-        const statsData = await obterEstatisticasFilho(targetChildId);
-        setStats(statsData);
+        // 4. Buscar estatísticas, autorizados e diário usando o ID do filho
+        const validChildId = childDb?.id || (isUuid ? targetChildId : null);
+        if (validChildId) {
+          const statsData = await obterEstatisticasFilho(validChildId);
+          setStats(statsData);
 
-        // 4. Buscar autorizados a retirar
-        const { data: authData, error: authError } = await supabase
-          .from('autorizados_retirada')
-          .select('*')
-          .eq('filho_id', targetChildId);
+          const { data: authData } = await supabase
+            .from('autorizados_retirada')
+            .select('*')
+            .eq('filho_id', validChildId);
+          if (authData) setAuthorizedList(authData);
 
-        if (!authError && authData) {
-          setAuthorizedList(authData);
+          const logs = await getDiarioBordoByFilho(validChildId);
+          setDiarioLogs(logs);
         }
-
-        // 5. Buscar diário de bordo
-        const logs = await getDiarioBordoByFilho(targetChildId);
-        setDiarioLogs(logs);
       } catch (err) {
         console.error("Erro ao carregar detalhes da criança:", err);
       } finally {
@@ -132,7 +155,7 @@ export default function ChildDetailsModal({ child, parent, voluntarioId, onClose
     };
 
     fetchData();
-  }, [child?.id, child?.filho_id]);
+  }, [child?.id, child?.filho_id, child?.responsavel_id, parent?.uid]);
 
   const checarAniversario = (dataNasc) => {
     if (!dataNasc) return null;
@@ -383,6 +406,31 @@ export default function ChildDetailsModal({ child, parent, voluntarioId, onClose
             </span>
           )}
 
+          {/* Alergias e Restrições Alimentares */}
+          {fullChild?.alergias ? (
+            <div style={{
+              background: 'rgba(239, 68, 68, 0.12)',
+              border: '1px solid rgba(239, 68, 68, 0.3)',
+              color: '#fca5a5',
+              padding: '0.75rem',
+              borderRadius: '10px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.25rem'
+            }}>
+              <span style={{ fontWeight: 700, fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#ef4444' }}>
+                <AlertTriangle size={16} /> Alergias & Restrições Alimentares
+              </span>
+              <p style={{ margin: 0, fontSize: '0.8rem', lineHeight: '1.4', color: '#fecdd3' }}>
+                {fullChild.alergias}
+              </p>
+            </div>
+          ) : (
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+              • Alergias / Restrições: Nenhuma informada
+            </span>
+          )}
+
           {/* Como Acalmar a Criança */}
           <div style={{
             background: fullChild?.como_acalmar ? 'rgba(99, 102, 241, 0.08)' : 'rgba(255,255,255,0.02)',
@@ -477,7 +525,7 @@ export default function ChildDetailsModal({ child, parent, voluntarioId, onClose
               {diarioLogs.map(log => (
                 <div key={log.id} style={{ background: 'rgba(255,255,255,0.03)', padding: '0.5rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--text-secondary)', marginBottom: '0.2rem' }}>
-                    <span>{new Date(log.created_at).toLocaleDateString('pt-BR')}</span>
+                    <span>{log.data_registro || log.created_at ? new Date(log.data_registro || log.created_at).toLocaleDateString('pt-BR') : 'Hoje'}</span>
                     <span>Voluntário(a): {log.voluntario?.nome || 'Equipe'}</span>
                   </div>
                   {log.tags && log.tags.length > 0 && (
