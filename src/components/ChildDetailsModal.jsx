@@ -106,9 +106,13 @@ export default function ChildDetailsModal({ child, parent, voluntarioId, onClose
               .order('data_cadastro', { ascending: false });
 
             if (kidsByParent && kidsByParent.length > 0) {
-              // Tentar encontrar por nome se disponível ou usar o primeiro filho cadastrado
-              const matchName = kidsByParent.find(k => child?.nome && k.nome.toLowerCase() === child.nome.toLowerCase());
-              childDb = matchName || kidsByParent[0];
+              const cName = (child?.nome || '').trim().toLowerCase();
+              const matchName = kidsByParent.find(k => {
+                const kName = (k.nome || '').trim().toLowerCase();
+                return cName && (kName === cName || kName.includes(cName) || cName.includes(kName));
+              });
+              // Se tiver só 1 filho ou encontrou pelo nome, usar. Se tiver múltiplos e não casar o nome, não forçar kidsByParent[0]
+              childDb = matchName || (kidsByParent.length === 1 ? kidsByParent[0] : null);
             }
           } catch (e) {
             console.log("Erro ao buscar filho pelo responsavel_id:", e);
@@ -118,18 +122,23 @@ export default function ChildDetailsModal({ child, parent, voluntarioId, onClose
         if (childDb) {
           setFullChild(childDb);
         } else {
-          // Se não encontrou nenhuma linha na tabela filhos, compor dados legíveis do responsável
-          setFullChild(prev => ({
-            ...prev,
-            nome: (prev?.nome && !prev.nome.includes('Filho(a) de') && prev.nome !== 'Criança')
-              ? prev.nome
-              : (parentDb?.nome ? `Filho(a) de ${parentDb.nome}` : (child?.nome || 'Criança')),
-            selfie: prev?.selfie || parentDb?.selfie || null,
-            neurodivergente: prev?.neurodivergente || false,
-            neurodivergencia_detalhe: prev?.neurodivergencia_detalhe || '',
-            como_acalmar: prev?.como_acalmar || '',
-            alergias: prev?.alergias || ''
-          }));
+          // Se não encontrou nenhuma linha específica na tabela filhos, preservar os dados recebidos
+          setFullChild(prev => {
+            const displayChildName = (child?.nome && child.nome !== 'Criança' && !child.nome.includes('Filho(a) de')) 
+              ? child.nome 
+              : ((prev?.nome && prev.nome !== 'Criança' && !prev.nome.includes('Filho(a) de')) 
+                  ? prev.nome 
+                  : (parentDb?.nome ? `Filho(a) de ${parentDb.nome}` : 'Criança'));
+            return {
+              ...prev,
+              nome: displayChildName,
+              selfie: prev?.selfie || child?.selfie || parentDb?.selfie || null,
+              neurodivergente: prev?.neurodivergente || false,
+              neurodivergencia_detalhe: prev?.neurodivergencia_detalhe || '',
+              como_acalmar: prev?.como_acalmar || '',
+              alergias: prev?.alergias || ''
+            };
+          });
         }
 
         // 4. Buscar estatísticas, autorizados e diário usando o ID do filho

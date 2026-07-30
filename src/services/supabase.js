@@ -408,14 +408,17 @@ export const subscribeToDailyAttendance = (callback) => {
         fObj = filhosMap[fidStr];
       }
 
-      // Fallback 1: Se a criança não foi encontrada diretamente pelo filho_id, mas temos o responsável, buscar pelo filhosByParentMap
+      // Fallback: Se a criança não foi encontrada diretamente pelo filho_id, mas temos o responsável
       if (!fObj && rIdStr && filhosByParentMap[rIdStr] && filhosByParentMap[rIdStr].length > 0) {
-        fObj = filhosByParentMap[rIdStr][0];
-      }
-
-      // Fallback 2: Se ainda for nulo, procurar se cleanFilhoId bate com algum usuário (ex: pai/mãe)
-      if (!fObj && fidStr && usersMap[fidStr] && filhosByParentMap[fidStr] && filhosByParentMap[fidStr].length > 0) {
-        fObj = filhosByParentMap[fidStr][0];
+        const parentKids = filhosByParentMap[rIdStr];
+        if (parentKids.length === 1) {
+          fObj = parentKids[0];
+        } else {
+          // Se o pai tem múltiplos filhos, tentar encontrar por ID ou nome se disponível
+          const matchedById = parentKids.find(k => String(k.id).toLowerCase() === fidStr);
+          const matchedByName = rec.filho?.nome ? parentKids.find(k => k.nome.toLowerCase().includes(rec.filho.nome.toLowerCase())) : null;
+          fObj = matchedById || matchedByName || null;
+        }
       }
 
       if (!rObj && rIdStr && usersMap[rIdStr]) {
