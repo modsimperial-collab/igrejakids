@@ -753,15 +753,14 @@ export default function VolunteerDashboard({ user }) {
                 return (
                   <div 
                     key={item.id} 
-                    className="auth-card"
                     style={{
                       background: 'rgba(255, 255, 255, 0.02)',
                       border: child?.neurodivergente ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid rgba(255, 255, 255, 0.04)',
-                      borderRadius: '12px',
-                      padding: '0.85rem',
+                      borderRadius: '8px',
+                      padding: '0.75rem',
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: '0.65rem',
+                      gap: '0.5rem',
                       transition: 'transform 0.15s ease'
                     }}
                   >
@@ -771,17 +770,17 @@ export default function VolunteerDashboard({ user }) {
                           <img 
                             src={child.selfie} 
                             alt={child.nome} 
-                            style={{ width: '42px', height: '42px', borderRadius: '50%', objectFit: 'cover', border: '1.5px solid var(--accent-primary)', flexShrink: 0 }} 
+                            style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover', border: '1.5px solid var(--accent-primary)', flexShrink: 0 }} 
                           />
                         ) : (
-                          <div style={{ width: '42px', height: '42px', borderRadius: '50%', background: 'rgba(255, 255, 255, 0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px dashed rgba(255,255,255,0.15)', flexShrink: 0 }}>
+                          <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: 'rgba(255, 255, 255, 0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px dashed rgba(255,255,255,0.1)', flexShrink: 0 }}>
                             <User size={18} style={{ color: 'var(--text-secondary)' }} />
                           </div>
                         )}
 
                         <div style={{ minWidth: 0 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                            <strong style={{ fontSize: '0.92rem', color: '#fff' }}>{child?.nome}</strong>
+                            <strong style={{ fontSize: '0.9rem', color: '#fff' }}>{child?.nome}</strong>
                             {child?.apelido && (
                               <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.05)', padding: '1px 6px', borderRadius: '4px' }}>
                                 ({child.apelido})
@@ -861,8 +860,7 @@ export default function VolunteerDashboard({ user }) {
                         }}>
                           Entrada
                         </span>
-                        <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-                          <Clock size={11} />
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
                           {checkInDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
@@ -874,8 +872,8 @@ export default function VolunteerDashboard({ user }) {
                         background: 'rgba(99, 102, 241, 0.12)',
                         border: '1px solid rgba(99, 102, 241, 0.25)',
                         color: '#c7d2fe',
-                        padding: '0.5rem 0.65rem',
-                        borderRadius: '8px',
+                        padding: '0.4rem 0.6rem',
+                        borderRadius: '6px',
                         fontSize: '0.75rem',
                         lineHeight: '1.35'
                       }}>
@@ -889,7 +887,7 @@ export default function VolunteerDashboard({ user }) {
                       justifyContent: 'space-between', 
                       alignItems: 'center', 
                       borderTop: '1px solid rgba(255,255,255,0.03)', 
-                      paddingTop: '0.5rem',
+                      paddingTop: '0.4rem',
                       fontSize: '0.75rem',
                       color: 'var(--text-secondary)',
                       flexWrap: 'wrap',
@@ -899,8 +897,8 @@ export default function VolunteerDashboard({ user }) {
                         Registrado por: <strong style={{ color: 'var(--text-primary)' }}>{vol?.nome || 'Voluntário'}</strong>
                       </span>
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        {child?.neurodivergente && child?.como_acalmar && (
+                      <div style={{ display: 'flex', gap: '0.4rem' }}>
+                        {(child?.neurodivergente || child?.como_acalmar) && child?.como_acalmar && (
                           <button 
                             onClick={() => alert(`Como acalmar ${child.nome}:\n\n${child.como_acalmar}`)}
                             style={{ 
@@ -908,8 +906,8 @@ export default function VolunteerDashboard({ user }) {
                               border: '1px solid rgba(245, 158, 11, 0.2)',
                               color: '#f59e0b',
                               fontSize: '0.7rem',
-                              padding: '4px 8px',
-                              borderRadius: '6px',
+                              padding: '3px 8px',
+                              borderRadius: '4px',
                               cursor: 'pointer'
                             }}
                           >
@@ -926,23 +924,19 @@ export default function VolunteerDashboard({ user }) {
                               border: '1px solid rgba(16, 185, 129, 0.2)',
                               color: '#10b981',
                               fontSize: '0.7rem',
-                              padding: '4px 8px',
-                              borderRadius: '6px',
+                              padding: '3px 8px',
+                              borderRadius: '4px',
                               textDecoration: 'none',
-                              fontWeight: 500,
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '0.3rem'
+                              fontWeight: 500
                             }}
                           >
-                            <MessageCircle size={12} />
-                            <span>WhatsApp</span>
+                            Chamar no WhatsApp
                           </a>
                         )}
                         <button 
                           onClick={() => setSelectedChildModal({ child, parent })}
                           className="btn btn-secondary"
-                          style={{ padding: '4px 8px', fontSize: '0.7rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                          style={{ padding: '3px 8px', fontSize: '0.7rem', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}
                         >
                           <FileText size={12} />
                           <span>Ver Ficha</span>

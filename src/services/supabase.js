@@ -403,9 +403,9 @@ export const subscribeToDailyAttendance = (callback) => {
       const rId = rec.responsavel_id || fObj?.responsavel_id;
       const rIdStr = rId ? String(rId).trim().toLowerCase() : '';
 
-      // Tentar encontrar fObj via filhosMap se não veio da query relacional
-      if (!fObj && fidStr && filhosMap[fidStr]) {
-        fObj = filhosMap[fidStr];
+      // Tentar encontrar e enriquecer fObj via filhosMap
+      if (fidStr && filhosMap[fidStr]) {
+        fObj = { ...filhosMap[fidStr], ...(fObj || {}) };
       }
 
       // Fallback: Se a criança não foi encontrada diretamente pelo filho_id, mas temos o responsável
@@ -416,8 +416,8 @@ export const subscribeToDailyAttendance = (callback) => {
         } else {
           // Se o pai tem múltiplos filhos, tentar encontrar por ID ou nome se disponível
           const matchedById = parentKids.find(k => String(k.id).toLowerCase() === fidStr);
-          const matchedByName = rec.filho?.nome ? parentKids.find(k => k.nome.toLowerCase().includes(rec.filho.nome.toLowerCase())) : null;
-          fObj = matchedById || matchedByName || null;
+          const matchedByName = (rec.filho?.nome && !rec.filho.nome.startsWith('Filho(a)')) ? parentKids.find(k => k.nome.toLowerCase().includes(rec.filho.nome.toLowerCase())) : null;
+          fObj = matchedById || matchedByName || parentKids[0];
         }
       }
 
