@@ -751,65 +751,54 @@ export default function VolunteerDashboard({ user }) {
                 const wppLink = parent?.telefone ? `https://wa.me/55${parent.telefone.replace(/\D/g, '')}?text=${msgWpp}` : null;
 
                 return (
-                  <div key={item.id} className="auth-card" style={{
-                    padding: '1rem',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.75rem',
-                    border: child?.neurodivergente ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid rgba(255, 255, 255, 0.08)',
-                    background: 'var(--bg-card)',
-                    borderRadius: '12px',
-                    position: 'relative'
-                  }}>
-                    {/* Top Row: Avatar + Info + Badge Entrada */}
+                  <div 
+                    key={item.id} 
+                    className="auth-card"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.02)',
+                      border: child?.neurodivergente ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid rgba(255, 255, 255, 0.04)',
+                      borderRadius: '12px',
+                      padding: '0.85rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.65rem',
+                      transition: 'transform 0.15s ease'
+                    }}
+                  >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'center', flex: 1, minWidth: 0 }}>
                         {child?.selfie ? (
                           <img 
                             src={child.selfie} 
                             alt={child.nome} 
-                            style={{
-                              width: '46px',
-                              height: '46px',
-                              borderRadius: '50%',
-                              objectFit: 'cover',
-                              border: '2px solid var(--accent-primary)',
-                              flexShrink: 0
-                            }}
+                            style={{ width: '42px', height: '42px', borderRadius: '50%', objectFit: 'cover', border: '1.5px solid var(--accent-primary)', flexShrink: 0 }} 
                           />
                         ) : (
-                          <div style={{
-                            width: '46px',
-                            height: '46px',
-                            borderRadius: '50%',
-                            background: 'rgba(255, 255, 255, 0.05)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            border: '1px dashed rgba(255,255,255,0.15)',
-                            flexShrink: 0
-                          }}>
-                            <User size={20} style={{ color: 'var(--text-secondary)' }} />
+                          <div style={{ width: '42px', height: '42px', borderRadius: '50%', background: 'rgba(255, 255, 255, 0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px dashed rgba(255,255,255,0.15)', flexShrink: 0 }}>
+                            <User size={18} style={{ color: 'var(--text-secondary)' }} />
                           </div>
                         )}
 
                         <div style={{ minWidth: 0 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                            <strong style={{ fontSize: '0.95rem', color: '#fff' }}>{child?.nome}</strong>
+                            <strong style={{ fontSize: '0.92rem', color: '#fff' }}>{child?.nome}</strong>
                             {child?.apelido && (
                               <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.05)', padding: '1px 6px', borderRadius: '4px' }}>
                                 ({child.apelido})
                               </span>
                             )}
                             {child?.neurodivergente && (
-                              <span style={{ 
-                                fontSize: '0.7rem', 
-                                background: 'rgba(245, 158, 11, 0.15)', 
-                                color: '#f59e0b', 
-                                padding: '1px 6px', 
-                                borderRadius: '4px',
-                                fontWeight: 600
-                              }}>
+                              <span 
+                                title={child.neurodivergencia_detalhe || 'Neurodivergente'}
+                                style={{ 
+                                  fontSize: '0.7rem', 
+                                  background: 'rgba(245, 158, 11, 0.15)', 
+                                  color: '#f59e0b', 
+                                  padding: '1px 6px', 
+                                  borderRadius: '4px',
+                                  fontWeight: 600
+                                }}
+                              >
                                 {child.neurodivergencia_detalhe || 'Neurodivergente'}
                               </span>
                             )}
@@ -832,11 +821,31 @@ export default function VolunteerDashboard({ user }) {
                             Responsável: <strong style={{ color: '#fff' }}>{parent?.nome || 'Não cadastrado'}</strong>
                           </span>
 
-                          {stats && (
-                            <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block', marginTop: '1px' }}>
-                              Frequência: <strong style={{ color: '#fff' }}>{stats.totalCheckins} cultos</strong>
-                            </span>
-                          )}
+                          {/* Exibir Frequência e Alerta de Ausência */}
+                          {(() => {
+                            const stats = childrenStats[child?.id];
+                            if (!stats) return null;
+                            return (
+                              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.2rem', flexWrap: 'wrap', fontSize: '0.75rem', color: 'var(--text-secondary)', alignItems: 'center' }}>
+                                <span>Frequência: <strong style={{ color: '#fff' }}>{stats.totalCheckins} cultos</strong></span>
+                                {stats.ultimoCheckin && (
+                                  <span>• Último: <strong style={{ color: '#fff' }}>{new Date(stats.ultimoCheckin).toLocaleDateString('pt-BR')} ({stats.diasAusente} dias)</strong></span>
+                                )}
+                                {stats.diasAusente && stats.diasAusente > 30 && (
+                                  <span style={{ 
+                                    background: 'rgba(245, 158, 11, 0.15)', 
+                                    color: '#fbbf24', 
+                                    padding: '1px 6px', 
+                                    borderRadius: '4px',
+                                    fontSize: '0.7rem',
+                                    fontWeight: 600
+                                  }}>
+                                    ⚠️ Ausente há mais de 1 mês!
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </div>
                       </div>
 
@@ -875,50 +884,67 @@ export default function VolunteerDashboard({ user }) {
                     )}
 
                     {/* Rodapé do Card com Ações (Registrado Por + WhatsApp + Ver Ficha) */}
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      borderTop: '1px solid rgba(255, 255, 255, 0.05)',
-                      paddingTop: '0.65rem',
-                      gap: '0.5rem',
-                      flexWrap: 'wrap'
+                    <div style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'center', 
+                      borderTop: '1px solid rgba(255,255,255,0.03)', 
+                      paddingTop: '0.5rem',
+                      fontSize: '0.75rem',
+                      color: 'var(--text-secondary)',
+                      flexWrap: 'wrap',
+                      gap: '0.4rem'
                     }}>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                      <span>
                         Registrado por: <strong style={{ color: 'var(--text-primary)' }}>{vol?.nome || 'Voluntário'}</strong>
                       </span>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        {child?.neurodivergente && child?.como_acalmar && (
+                          <button 
+                            onClick={() => alert(`Como acalmar ${child.nome}:\n\n${child.como_acalmar}`)}
+                            style={{ 
+                              background: 'rgba(245, 158, 11, 0.1)', 
+                              border: '1px solid rgba(245, 158, 11, 0.2)',
+                              color: '#f59e0b',
+                              fontSize: '0.7rem',
+                              padding: '4px 8px',
+                              borderRadius: '6px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Como Acalmar
+                          </button>
+                        )}
                         {wppLink && (
-                          <a
+                          <a 
                             href={wppLink}
                             target="_blank"
                             rel="noopener noreferrer"
-                            style={{
-                              background: 'rgba(16, 185, 129, 0.1)',
-                              border: '1px solid rgba(16, 185, 129, 0.25)',
+                            style={{ 
+                              background: 'rgba(16, 185, 129, 0.1)', 
+                              border: '1px solid rgba(16, 185, 129, 0.2)',
                               color: '#10b981',
-                              padding: '5px 10px',
+                              fontSize: '0.7rem',
+                              padding: '4px 8px',
                               borderRadius: '6px',
                               textDecoration: 'none',
-                              fontSize: '0.75rem',
-                              fontWeight: 600,
+                              fontWeight: 500,
                               display: 'inline-flex',
                               alignItems: 'center',
                               gap: '0.3rem'
                             }}
                           >
-                            <MessageCircle size={13} />
+                            <MessageCircle size={12} />
                             <span>WhatsApp</span>
                           </a>
                         )}
-
-                        <button
+                        <button 
                           onClick={() => setSelectedChildModal({ child, parent })}
                           className="btn btn-secondary"
-                          style={{ padding: '5px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                          style={{ padding: '4px 8px', fontSize: '0.7rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
                         >
-                          <FileText size={13} />
+                          <FileText size={12} />
                           <span>Ver Ficha</span>
                         </button>
                       </div>

@@ -1044,6 +1044,19 @@ export default function AdminDashboard({ user }) {
                                   {child.neurodivergencia_detalhe || 'Neurodivergente'}
                                 </span>
                               )}
+                              {child.alergias && (
+                                <span style={{ 
+                                  fontSize: '0.7rem', 
+                                  background: 'rgba(239, 68, 68, 0.15)', 
+                                  color: '#fca5a5', 
+                                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                                  padding: '1px 6px', 
+                                  borderRadius: '4px',
+                                  fontWeight: 600
+                                }}>
+                                  ⚠️ Alergia: {child.alergias}
+                                </span>
+                              )}
                             </div>
                             <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block' }}>
                               Responsável: {parent.nome}
@@ -1144,6 +1157,14 @@ export default function AdminDashboard({ user }) {
                               Chamar no WhatsApp
                             </a>
                           )}
+                          <button 
+                            onClick={() => setSelectedChildModal({ child, parent })}
+                            className="btn btn-secondary"
+                            style={{ padding: '3px 8px', fontSize: '0.7rem', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}
+                          >
+                            <FileText size={12} />
+                            <span>Ver Ficha</span>
+                          </button>
                         </div>
                       </div>
                     </div>
