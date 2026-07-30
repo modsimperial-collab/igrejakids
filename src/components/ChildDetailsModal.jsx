@@ -23,6 +23,8 @@ import { supabase, obterEstatisticasFilho, saveDiarioBordo, getDiarioBordoByFilh
 import EmergencyCallModal from './EmergencyCallModal';
 
 export default function ChildDetailsModal({ child, parent, voluntarioId, onClose }) {
+  const [fullChild, setFullChild] = useState(child);
+  const [fullParent, setFullParent] = useState(parent);
   const [authorizedList, setAuthorizedList] = useState([]);
   const [stats, setStats] = useState(null);
   const [diarioLogs, setDiarioLogs] = useState([]);
@@ -47,27 +49,58 @@ export default function ChildDetailsModal({ child, parent, voluntarioId, onClose
   ];
 
   useEffect(() => {
-    if (!child?.id) return;
+    setFullChild(child);
+    setFullParent(parent);
+  }, [child, parent]);
+
+  useEffect(() => {
+    const targetChildId = child?.id || child?.filho_id;
+    if (!targetChildId) return;
 
     const fetchData = async () => {
       setLoading(true);
       try {
-        // Buscar estatísticas de presença
-        const statsData = await obterEstatisticasFilho(child.id);
+        // 1. Buscar dados completos da criança diretamente do banco
+        const { data: childDb } = await supabase
+          .from('filhos')
+          .select('*')
+          .eq('id', targetChildId)
+          .maybeSingle();
+
+        if (childDb) {
+          setFullChild(childDb);
+        }
+
+        // 2. Buscar dados do responsável
+        const parentId = childDb?.responsavel_id || child?.responsavel_id || parent?.uid;
+        if (parentId) {
+          const { data: parentDb } = await supabase
+            .from('usuarios')
+            .select('*')
+            .eq('uid', parentId)
+            .maybeSingle();
+
+          if (parentDb) {
+            setFullParent(parentDb);
+          }
+        }
+
+        // 3. Buscar estatísticas de presença
+        const statsData = await obterEstatisticasFilho(targetChildId);
         setStats(statsData);
 
-        // Buscar autorizados a retirar
+        // 4. Buscar autorizados a retirar
         const { data: authData, error: authError } = await supabase
           .from('autorizados_retirada')
           .select('*')
-          .eq('filho_id', child.id);
+          .eq('filho_id', targetChildId);
 
         if (!authError && authData) {
           setAuthorizedList(authData);
         }
 
-        // Buscar diário de bordo
-        const logs = await getDiarioBordoByFilho(child.id);
+        // 5. Buscar diário de bordo
+        const logs = await getDiarioBordoByFilho(targetChildId);
         setDiarioLogs(logs);
       } catch (err) {
         console.error("Erro ao carregar detalhes da criança:", err);
@@ -77,7 +110,7 @@ export default function ChildDetailsModal({ child, parent, voluntarioId, onClose
     };
 
     fetchData();
-  }, [child]);
+  }, [child?.id, child?.filho_id]);
 
   const checarAniversario = (dataNasc) => {
     if (!dataNasc) return null;
@@ -97,7 +130,7 @@ export default function ChildDetailsModal({ child, parent, voluntarioId, onClose
     return null;
   };
 
-  const niverInfo = checarAniversario(child?.data_nascimento);
+  const niverInfo = checarAniversario(fullChild?.data_nascimento);
 
   const toggleTag = (tag) => {
     if (selectedTags.includes(tag)) {
@@ -116,8 +149,8 @@ export default function ChildDetailsModal({ child, parent, voluntarioId, onClose
 
     setSavingDiario(true);
     try {
-      await saveDiarioBordo(child.id, voluntarioId, selectedTags, obsDiario);
-      const updatedLogs = await getDiarioBordoByFilho(child.id);
+      await saveDiarioBordo(fullChild.id, voluntarioId, selectedTags, obsDiario);
+      const updatedLogs = await getDiarioBordoByFilho(fullChild.id);
       setDiarioLogs(updatedLogs);
       setSelectedTags([]);
       setObsDiario('');
@@ -142,11 +175,11 @@ export default function ChildDetailsModal({ child, parent, voluntarioId, onClose
     return idade > 0 ? `${idade} anos` : 'Menos de 1 ano';
   };
 
-  const idadeTexto = calcularIdade(child?.data_nascimento);
+  const idadeTexto = calcularIdade(fullChild?.data_nascimento);
 
   // Link do WhatsApp com mensagem pré-formatada
-  const msgWpp = encodeURIComponent(`Olá, ${parent?.nome || 'Responsável'}! Sou voluntário(a) da Igreja da Criança AD Madureira e estou acompanhando o(a) ${child?.nome}. Gostaria de falar com você.`);
-  const wppLink = parent?.telefone ? `https://wa.me/55${parent.telefone.replace(/\D/g, '')}?text=${msgWpp}` : null;
+  const msgWpp = encodeURIComponent(`Olá, ${fullParent?.nome || 'Responsável'}! Sou voluntário(a) da Igreja da Criança AD Madureira e estou acompanhando o(a) ${fullChild?.nome || 'sua criança'}. Gostaria de falar com você.`);
+  const wppLink = fullParent?.telefone ? `https://wa.me/55${fullParent.telefone.replace(/\D/g, '')}?text=${msgWpp}` : null;
 
   return (
     <div 
@@ -221,10 +254,10 @@ export default function ChildDetailsModal({ child, parent, voluntarioId, onClose
 
         {/* Header da Criança (Foto e Nome) */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-          {child?.selfie ? (
+          {fullChild?.selfie ? (
             <img 
-              src={child.selfie} 
-              alt={child.nome} 
+              src={fullChild.selfie} 
+              alt={fullChild.nome} 
               style={{
                 width: '110px',
                 height: '110px',
@@ -252,11 +285,11 @@ export default function ChildDetailsModal({ child, parent, voluntarioId, onClose
             </div>
           )}
           <h3 className="heading-font" style={{ fontSize: '1.25rem', color: '#fff', margin: 0, textAlign: 'center' }}>
-            {child?.nome}
+            {fullChild?.nome}
           </h3>
-          {child?.apelido && (
+          {fullChild?.apelido && (
             <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.05)', padding: '2px 10px', borderRadius: '12px' }}>
-              Chamado(a) carinhosamente de: <strong style={{ color: '#fff' }}>"{child.apelido}"</strong>
+              Chamado(a) carinhosamente de: <strong style={{ color: '#fff' }}>"{fullChild.apelido}"</strong>
             </span>
           )}
           {idadeTexto && (
@@ -304,7 +337,7 @@ export default function ChildDetailsModal({ child, parent, voluntarioId, onClose
           </h4>
 
           {/* Neurodivergência */}
-          {child?.neurodivergente ? (
+          {fullChild?.neurodivergente ? (
             <div style={{
               background: 'rgba(245, 158, 11, 0.12)',
               border: '1px solid rgba(245, 158, 11, 0.25)',
@@ -319,7 +352,7 @@ export default function ChildDetailsModal({ child, parent, voluntarioId, onClose
                 <Sparkles size={16} /> Neurodivergente
               </span>
               <p style={{ margin: 0, fontSize: '0.8rem', lineHeight: '1.4', color: '#fef08a' }}>
-                {child.neurodivergencia_detalhe || 'Diagnóstico/Atendimento Especializado informado pelo responsável.'}
+                {fullChild.neurodivergencia_detalhe || 'Diagnóstico/Atendimento Especializado informado pelo responsável.'}
               </p>
             </div>
           ) : (
@@ -330,16 +363,16 @@ export default function ChildDetailsModal({ child, parent, voluntarioId, onClose
 
           {/* Como Acalmar a Criança */}
           <div style={{
-            background: child?.como_acalmar ? 'rgba(99, 102, 241, 0.08)' : 'rgba(255,255,255,0.02)',
-            border: child?.como_acalmar ? '1px solid rgba(99, 102, 241, 0.2)' : '1px solid rgba(255,255,255,0.04)',
+            background: fullChild?.como_acalmar ? 'rgba(99, 102, 241, 0.08)' : 'rgba(255,255,255,0.02)',
+            border: fullChild?.como_acalmar ? '1px solid rgba(99, 102, 241, 0.2)' : '1px solid rgba(255,255,255,0.04)',
             padding: '0.75rem',
             borderRadius: '10px'
           }}>
             <strong style={{ fontSize: '0.8rem', color: '#fff', display: 'block', marginBottom: '0.3rem' }}>
               💡 Como acalmar ou interagir com a criança:
             </strong>
-            <p style={{ margin: 0, fontSize: '0.8rem', color: child?.como_acalmar ? '#c7d2fe' : 'var(--text-secondary)', fontStyle: child?.como_acalmar ? 'normal' : 'italic', lineHeight: '1.4' }}>
-              {child?.como_acalmar ? `"${child.como_acalmar}"` : 'Nenhuma recomendação de como acalmar preenchida.'}
+            <p style={{ margin: 0, fontSize: '0.8rem', color: fullChild?.como_acalmar ? '#c7d2fe' : 'var(--text-secondary)', fontStyle: fullChild?.como_acalmar ? 'normal' : 'italic', lineHeight: '1.4' }}>
+              {fullChild?.como_acalmar ? `"${fullChild.como_acalmar}"` : 'Nenhuma recomendação de como acalmar preenchida.'}
             </p>
           </div>
         </div>
@@ -461,10 +494,10 @@ export default function ChildDetailsModal({ child, parent, voluntarioId, onClose
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
             <div>
               <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#fff', display: 'block' }}>
-                {parent?.nome || 'Responsável cadastrado'}
+                {fullParent?.nome || 'Responsável cadastrado'}
               </span>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                Telefone: {parent?.telefone || 'Não informado'}
+                Telefone: {fullParent?.telefone || 'Não informado'}
               </span>
             </div>
 
@@ -580,8 +613,8 @@ export default function ChildDetailsModal({ child, parent, voluntarioId, onClose
         {/* MODAL DE CHAMADA DE EMERGÊNCIA */}
         {showEmergencyModal && (
           <EmergencyCallModal
-            child={child}
-            parent={parent}
+            child={fullChild}
+            parent={fullParent}
             voluntarioId={voluntarioId}
             onClose={() => setShowEmergencyModal(false)}
             onSuccess={() => {
