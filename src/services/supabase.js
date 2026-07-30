@@ -466,6 +466,8 @@ export const subscribeToChamadasEmergencia = (responsavelId, callback) => {
   };
 };
 
+export const subscribeToChamadasEmergenciaResponsavel = subscribeToChamadasEmergencia;
+
 /**
  * 3. Escala de Voluntários & Trocas
  */

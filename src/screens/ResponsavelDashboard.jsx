@@ -67,7 +67,7 @@ export default function ResponsavelDashboard({ user }) {
     if (!user?.uid) return;
 
     const unsubscribe = subscribeToChamadasEmergenciaResponsavel(user.uid, (chamadas) => {
-      const ativas = chamadas.filter(c => c.status === 'pendente');
+      const ativas = chamadas.filter(c => c.status === 'ativa' || c.status === 'pendente');
       setActiveEmergencies(ativas);
     });
 
@@ -810,7 +810,7 @@ export default function ResponsavelDashboard({ user }) {
                         {diariosByChild[child.id].slice(0, 2).map(log => (
                           <div key={log.id} style={{ background: 'rgba(255,255,255,0.02)', padding: '0.5rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)' }}>
                             <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginBottom: '0.2rem' }}>
-                              {new Date(log.created_at).toLocaleDateString('pt-BR')} • Tia/Tio: {log.voluntario?.nome || 'Equipe'}
+                              {new Date(log.data_registro || log.created_at || Date.now()).toLocaleDateString('pt-BR')} • Tia/Tio: {log.voluntario?.nome || 'Equipe'}
                             </div>
                             {log.tags && log.tags.length > 0 && (
                               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem', marginBottom: '0.2rem' }}>
