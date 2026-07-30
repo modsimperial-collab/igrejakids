@@ -261,15 +261,24 @@ export const deleteChild = async (childId) => {
 };
 
 export const registrarPresenca = async (filhoId, responsavelId, voluntarioId) => {
-  // 1. Buscar última transação de hoje para este filho
-  const hojeInicio = new Date();
-  hojeInicio.setHours(0, 0, 0, 0);
+  // Pegar registros das últimas 24h para determinar se a ação é entrada ou saída
+  const vinteEQuatroHorasAtras = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+  let finalResponsavelId = responsavelId;
+  if (!finalResponsavelId) {
+    const { data: childData } = await supabase
+      .from('filhos')
+      .select('responsavel_id')
+      .eq('id', filhoId)
+      .maybeSingle();
+    finalResponsavelId = childData?.responsavel_id || voluntarioId;
+  }
 
   const { data: ultimas, error: fetchError } = await supabase
     .from('registro_presencas')
     .select('*')
     .eq('filho_id', filhoId)
-    .gte('data_registro', hojeInicio.toISOString())
+    .gte('data_registro', vinteEQuatroHorasAtras.toISOString())
     .order('data_registro', { ascending: false })
     .limit(1);
 
@@ -289,7 +298,7 @@ export const registrarPresenca = async (filhoId, responsavelId, voluntarioId) =>
     .insert([
       {
         filho_id: filhoId,
-        responsavel_id: responsavelId,
+        responsavel_id: finalResponsavelId,
         voluntario_id: voluntarioId,
         tipo_transacao: novoTipo,
         data_registro: new Date().toISOString()
@@ -307,29 +316,68 @@ export const registrarPresenca = async (filhoId, responsavelId, voluntarioId) =>
 };
 
 export const subscribeToDailyAttendance = (callback) => {
-  const hojeInicio = new Date();
-  hojeInicio.setHours(0, 0, 0, 0);
+  // Pegar registros das últimas 24 horas para cobrir qualquer variação de fuso horário
+  const vinteEQuatroHorasAtras = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
   const fetchAttendance = async () => {
-    const { data, error } = await supabase
+    // 1. Tentar busca principal com relações (joins)
+    let { data, error } = await supabase
       .from('registro_presencas')
       .select(`
         id,
+        filho_id,
+        responsavel_id,
+        voluntario_id,
         tipo_transacao,
         data_registro,
         filho:filho_id(id, nome, data_nascimento, apelido, neurodivergente, neurodivergencia_detalhe, como_acalmar, alergias, selfie),
         responsavel:responsavel_id(uid, nome, telefone),
         voluntario:voluntario_id(uid, nome)
       `)
-      .gte('data_registro', hojeInicio.toISOString())
+      .gte('data_registro', vinteEQuatroHorasAtras.toISOString())
       .order('data_registro', { ascending: false });
 
-    if (!error && data) {
-      callback(data);
-    } else if (error) {
-      if (!error.message?.includes('schema cache')) {
-        console.error("Erro ao carregar presenças do dia:", error);
+    // 2. Se a busca com relacionamento falhou (por exemplo, se as FKs não existem no banco), faz a busca simples
+    if (error || !data) {
+      const { data: rawData } = await supabase
+        .from('registro_presencas')
+        .select('*')
+        .gte('data_registro', vinteEQuatroHorasAtras.toISOString())
+        .order('data_registro', { ascending: false });
+
+      data = rawData || [];
+    }
+
+    if (data && data.length > 0) {
+      // Garantir resolução dos objetos de filho, responsavel e voluntario caso o join automático do Supabase retorne null
+      const missingFilhoIds = [...new Set(data.filter(r => !r.filho && r.filho_id).map(r => r.filho_id))];
+      const missingUserIds = [...new Set([
+        ...data.filter(r => !r.responsavel && r.responsavel_id).map(r => r.responsavel_id),
+        ...data.filter(r => !r.voluntario && r.voluntario_id).map(r => r.voluntario_id)
+      ])];
+
+      let filhosMap = {};
+      let usersMap = {};
+
+      if (missingFilhoIds.length > 0) {
+        const { data: fData } = await supabase.from('filhos').select('*').in('id', missingFilhoIds);
+        if (fData) fData.forEach(f => { filhosMap[f.id] = f; });
       }
+
+      if (missingUserIds.length > 0) {
+        const { data: uData } = await supabase.from('usuarios').select('uid, nome, telefone').in('uid', missingUserIds);
+        if (uData) uData.forEach(u => { usersMap[u.uid] = u; });
+      }
+
+      const formatted = data.map(rec => ({
+        ...rec,
+        filho: rec.filho || filhosMap[rec.filho_id] || { id: rec.filho_id, nome: 'Criança' },
+        responsavel: rec.responsavel || usersMap[rec.responsavel_id] || { uid: rec.responsavel_id, nome: 'Responsável' },
+        voluntario: rec.voluntario || usersMap[rec.voluntario_id] || { uid: rec.voluntario_id, nome: 'Voluntário' }
+      }));
+
+      callback(formatted);
+    } else {
       callback([]);
     }
   };
@@ -372,23 +420,31 @@ export const obterEstatisticasFilho = async (filhoId) => {
     throw new Error(error.message);
   }
 
-  const totalCheckins = data ? data.length : 0;
+  if (!data || data.length === 0) {
+    return {
+      totalCheckins: 0,
+      ultimoCheckin: null,
+      diasAusente: null
+    };
+  }
+
+  // Contar apenas DIAS/CULTOS ÚNICOS (mesmo se teve mais de uma entrada no mesmo dia)
+  const datasUnicas = new Set(
+    data.map(item => new Date(item.data_registro).toISOString().split('T')[0])
+  );
+  const totalCheckins = datasUnicas.size;
   
-  // Encontrar o último check-in anterior a hoje
-  let ultimoCheckin = null;
+  // Encontrar o último check-in de um DIA ANTERIOR a hoje
   const hojeInicio = new Date();
   hojeInicio.setHours(0, 0, 0, 0);
 
-  if (data && data.length > 0) {
-    const primeiro = new Date(data[0].data_registro);
-    if (primeiro >= hojeInicio && data.length > 1) {
-      ultimoCheckin = data[1].data_registro;
-    } else if (primeiro < hojeInicio) {
-      ultimoCheckin = data[0].data_registro;
-    }
+  let ultimoCheckin = null;
+  const datasAnteriores = data.filter(item => new Date(item.data_registro) < hojeInicio);
+  if (datasAnteriores.length > 0) {
+    ultimoCheckin = datasAnteriores[0].data_registro;
   }
 
-  // Calcular dias desde o último check-in
+  // Calcular dias desde o último check-in de culto anterior
   let diasAusente = null;
   if (ultimoCheckin) {
     const diffTime = Math.abs(new Date() - new Date(ultimoCheckin));

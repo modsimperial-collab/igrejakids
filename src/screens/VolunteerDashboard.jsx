@@ -413,21 +413,41 @@ export default function VolunteerDashboard({ user }) {
               const parsed = getParsedResult(scanResult);
               return (
                 <div className="info-banner" style={{ 
-                  background: 'rgba(16, 185, 129, 0.15)', 
-                  border: '1px solid rgba(16, 185, 129, 0.3)', 
-                  color: '#a7f3d0', 
+                  background: lastTransaction?.tipo_transacao === 'saida' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.15)', 
+                  border: lastTransaction?.tipo_transacao === 'saida' ? '1px solid rgba(245, 158, 11, 0.3)' : '1px solid rgba(16, 185, 129, 0.3)', 
+                  color: lastTransaction?.tipo_transacao === 'saida' ? '#fde68a' : '#a7f3d0', 
                   marginTop: '0.5rem',
                   flexDirection: 'column',
                   alignItems: 'flex-start',
                   gap: '0.65rem',
-                  padding: '1rem'
+                  padding: '1rem',
+                  borderRadius: '12px'
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <CheckCircle size={20} style={{ color: 'var(--accent-success)' }} />
-                    <strong style={{ fontSize: '0.95rem' }}>
-                      {registeringPresence ? 'Registrando presença...' : (lastTransaction?.tipo_transacao === 'saida' ? 'Saída Confirmada! (Check-Out)' : 'Entrada Confirmada! (Check-In)')}
-                    </strong>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <CheckCircle size={20} style={{ color: lastTransaction?.tipo_transacao === 'saida' ? '#f59e0b' : 'var(--accent-success)' }} />
+                      <strong style={{ fontSize: '0.95rem' }}>
+                        {registeringPresence ? 'Registrando no banco de dados...' : (lastTransaction?.tipo_transacao === 'saida' ? 'Saída Confirmada! (Check-Out)' : 'Entrada Confirmada! (Check-In)')}
+                      </strong>
+                    </div>
+
+                    {lastTransaction?.tipo_transacao === 'entrada' && (
+                      <button 
+                        onClick={() => handleTabChange('criancas')}
+                        className="btn btn-primary"
+                        style={{ width: 'auto', padding: '0.35rem 0.65rem', fontSize: '0.75rem' }}
+                      >
+                        Ver na Supervisão →
+                      </button>
+                    )}
                   </div>
+
+                  {lastTransaction?.tipo_transacao === 'saida' && (
+                    <div style={{ background: 'rgba(0,0,0,0.2)', padding: '0.5rem 0.75rem', borderRadius: '6px', fontSize: '0.75rem', color: '#fef3c7', width: '100%' }}>
+                      💡 <strong>Atenção:</strong> Como a criança já possuía uma entrada ativa hoje, esta leitura registrou a <strong>SAÍDA (Check-out)</strong>. Ela saiu da aba de supervisão. Para dar entrada novamente, leia o QR Code mais uma vez.
+                    </div>
+                  )}
+
                   {parsed ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', width: '100%' }}>
                       {scannedChildData?.selfie && (
