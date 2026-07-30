@@ -713,7 +713,7 @@ export const assumirTrocaEscala = async (escalaId, voluntarioId) => {
 /**
  * 4. Check-in Express para Visitantes (Primeira Vez)
  */
-export const cadastrarFilhoExpressVisitante = async ({ nome, dataNascimento, responsavelNome, responsavelTelefone, voluntarioId }) => {
+export const cadastrarFilhoExpressVisitante = async ({ nome, dataNascimento, responsavelNome, responsavelTelefone, responsavelFoto, filhoFoto, voluntarioId }) => {
   // 1. Verificar se existe usuário responsável temporário para o visitante
   let tempUserId = null;
   const tempEmail = `visitante_${Date.now()}@igrejakids.temp`;
@@ -727,6 +727,12 @@ export const cadastrarFilhoExpressVisitante = async ({ nome, dataNascimento, res
 
   if (usuarioExistente) {
     tempUserId = usuarioExistente.uid;
+    if (responsavelFoto) {
+      await supabase
+        .from('usuarios')
+        .update({ selfie: responsavelFoto })
+        .eq('uid', tempUserId);
+    }
   } else {
     // Criar um usuário visitante na tabela usuarios diretamente
     const fakeUid = `visitante_${Date.now()}`;
@@ -739,7 +745,8 @@ export const cadastrarFilhoExpressVisitante = async ({ nome, dataNascimento, res
         tipo_usuario: 'responsavel',
         aprovado: true,
         telefone: responsavelTelefone,
-        membro_igreja: false
+        membro_igreja: false,
+        selfie: responsavelFoto || null
       }])
       .select();
 
@@ -763,7 +770,8 @@ export const cadastrarFilhoExpressVisitante = async ({ nome, dataNascimento, res
       data_nascimento: dataNascimento || null,
       idade: calculatedAge,
       visitante: true,
-      termo_aceito: true
+      termo_aceito: true,
+      selfie: filhoFoto || null
     }])
     .select();
 

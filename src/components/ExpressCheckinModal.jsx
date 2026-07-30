@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
-import { X, UserCheck, User, Phone, Calendar, Sparkles } from 'lucide-react';
+import { X, UserCheck, User, Phone, Calendar, Sparkles, Camera } from 'lucide-react';
 import { cadastrarFilhoExpressVisitante } from '../services/supabase';
+import SelfieCapture from './SelfieCapture';
 
 export default function ExpressCheckinModal({ voluntarioId, onClose, onSuccess }) {
   const [childName, setChildName] = useState('');
   const [childBirthdate, setChildBirthdate] = useState('');
   const [parentName, setParentName] = useState('');
   const [parentPhone, setParentPhone] = useState('');
+  const [parentFoto, setParentFoto] = useState(null);
+  const [childFoto, setChildFoto] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -26,6 +29,8 @@ export default function ExpressCheckinModal({ voluntarioId, onClose, onSuccess }
         dataNascimento: childBirthdate,
         responsavelNome: parentName,
         responsavelTelefone: parentPhone,
+        responsavelFoto: parentFoto,
+        filhoFoto: childFoto,
         voluntarioId
       });
 
@@ -57,7 +62,9 @@ export default function ExpressCheckinModal({ voluntarioId, onClose, onSuccess }
         background: 'var(--bg-secondary)',
         border: '1px solid rgba(14, 165, 233, 0.3)',
         borderRadius: '16px',
-        maxWidth: '480px',
+        maxWidth: '520px',
+        maxHeight: '90vh',
+        overflowY: 'auto',
         width: '100%',
         padding: '1.5rem',
         boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
@@ -103,6 +110,12 @@ export default function ExpressCheckinModal({ voluntarioId, onClose, onSuccess }
             </div>
           </div>
 
+          <SelfieCapture
+            label="Foto da Criança (Selfie)"
+            initialValue={childFoto}
+            onCapture={(photo) => setChildFoto(photo)}
+          />
+
           <div className="form-group">
             <label className="form-label">Data de Nascimento (Opcional)</label>
             <div className="input-wrapper">
@@ -146,6 +159,12 @@ export default function ExpressCheckinModal({ voluntarioId, onClose, onSuccess }
               <Phone className="input-icon" size={18} />
             </div>
           </div>
+
+          <SelfieCapture
+            label="Foto do Responsável (Selfie)"
+            initialValue={parentFoto}
+            onCapture={(photo) => setParentFoto(photo)}
+          />
 
           <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
             <button

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Camera, Upload, RotateCcw, AlertCircle, Check } from 'lucide-react';
 
-export default function SelfieCapture({ onCapture, initialValue }) {
+export default function SelfieCapture({ onCapture, initialValue, label = "Sua Foto (Selfie para identificação)" }) {
   const [photo, setPhoto] = useState(initialValue || null);
   const [useCamera, setUseCamera] = useState(false);
   const [cameraError, setCameraError] = useState('');
@@ -125,7 +125,7 @@ export default function SelfieCapture({ onCapture, initialValue }) {
       border: '1px solid rgba(255, 255, 255, 0.05)',
       marginTop: '0.5rem'
     }}>
-      <label className="form-label" style={{ alignSelf: 'flex-start', margin: 0 }}>Sua Foto (Selfie para identificação)</label>
+      <label className="form-label" style={{ alignSelf: 'flex-start', margin: 0 }}>{label}</label>
 
       {/* Frame de Exibição / Câmera */}
       <div style={{
