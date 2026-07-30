@@ -320,19 +320,42 @@ export const subscribeToDailyAttendance = (callback) => {
   const vinteEQuatroHorasAtras = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
   const fetchAttendance = async () => {
-    // Buscar registros de presença das últimas 24 horas
-    const { data: rawData, error } = await supabase
-      .from('registro_presencas')
-      .select('*')
-      .gte('data_registro', vinteEQuatroHorasAtras.toISOString())
-      .order('data_registro', { ascending: false });
+    // 1. Tentar busca relacional direta via Supabase PostgREST
+    let rawData = null;
+    try {
+      const { data: relationalData, error: relError } = await supabase
+        .from('registro_presencas')
+        .select('*, filho:filhos(*), responsavel:usuarios!responsavel_id(*), voluntario:usuarios!voluntario_id(*)')
+        .gte('data_registro', vinteEQuatroHorasAtras.toISOString())
+        .order('data_registro', { ascending: false });
 
-    if (error || !rawData || rawData.length === 0) {
+      if (!relError && relationalData) {
+        rawData = relationalData;
+      }
+    } catch (e) {
+      console.warn("Busca relacional falhou, tentando fallback simples:", e);
+    }
+
+    if (!rawData) {
+      const { data: simpleData, error } = await supabase
+        .from('registro_presencas')
+        .select('*')
+        .gte('data_registro', vinteEQuatroHorasAtras.toISOString())
+        .order('data_registro', { ascending: false });
+
+      if (error || !simpleData || simpleData.length === 0) {
+        callback([]);
+        return;
+      }
+      rawData = simpleData;
+    }
+
+    if (!rawData || rawData.length === 0) {
       callback([]);
       return;
     }
 
-    // Buscar TODOS os filhos e usuários para mapeamento 100% completo e sem falhas de tipo/RLS
+    // 2. Buscar TODOS os filhos e usuários para mapeamento em memória
     let { data: allFilhos } = await supabase.from('filhos').select('*');
     let { data: allUsuarios } = await supabase.from('usuarios').select('*');
 
@@ -340,13 +363,12 @@ export const subscribeToDailyAttendance = (callback) => {
     const filhosByParentMap = {};
     if (allFilhos) {
       allFilhos.forEach(f => {
-        if (!f.id) return;
+        if (!f || !f.id) return;
         const idStr = String(f.id).trim().toLowerCase();
         filhosMap[idStr] = f;
-        filhosMap[f.id] = f;
 
         if (f.responsavel_id) {
-          const pId = String(f.responsavel_id).trim();
+          const pId = String(f.responsavel_id).trim().toLowerCase();
           if (!filhosByParentMap[pId]) filhosByParentMap[pId] = [];
           filhosByParentMap[pId].push(f);
         }
@@ -356,14 +378,18 @@ export const subscribeToDailyAttendance = (callback) => {
     const usersMap = {};
     if (allUsuarios) {
       allUsuarios.forEach(u => {
-        if (!u.uid) return;
-        const uidStr = String(u.uid).trim();
+        if (!u || !u.uid) return;
+        const uidStr = String(u.uid).trim().toLowerCase();
         usersMap[uidStr] = u;
-        usersMap[u.uid] = u;
       });
     }
 
     const formatted = rawData.map(rec => {
+      // Tratar se rec.filho já veio preenchido da query relacional
+      let fObj = (rec.filho && rec.filho.nome && rec.filho.nome !== 'Criança') ? rec.filho : null;
+      let rObj = (rec.responsavel && rec.responsavel.nome) ? rec.responsavel : null;
+      let vObj = (rec.voluntario && rec.voluntario.nome) ? rec.voluntario : null;
+
       // Tratar caso rec.filho_id venha em formato JSON ou com aspas extras
       let cleanFilhoId = rec.filho_id;
       if (typeof rec.filho_id === 'string' && rec.filho_id.startsWith('{')) {
@@ -374,22 +400,42 @@ export const subscribeToDailyAttendance = (callback) => {
       }
 
       const fidStr = cleanFilhoId ? String(cleanFilhoId).trim().toLowerCase() : '';
-      let fObj = filhosMap[fidStr] || filhosMap[cleanFilhoId] || filhosMap[rec.filho_id];
-
       const rId = rec.responsavel_id || fObj?.responsavel_id;
-      const rIdStr = rId ? String(rId).trim() : '';
+      const rIdStr = rId ? String(rId).trim().toLowerCase() : '';
 
-      // Fallback: Se a criança não foi encontrada diretamente pelo filho_id, mas temos o responsável, associar o filho do responsável
+      // Tentar encontrar fObj via filhosMap se não veio da query relacional
+      if (!fObj && fidStr && filhosMap[fidStr]) {
+        fObj = filhosMap[fidStr];
+      }
+
+      // Fallback 1: Se a criança não foi encontrada diretamente pelo filho_id, mas temos o responsável, buscar pelo filhosByParentMap
       if (!fObj && rIdStr && filhosByParentMap[rIdStr] && filhosByParentMap[rIdStr].length > 0) {
         fObj = filhosByParentMap[rIdStr][0];
       }
 
-      const rObj = usersMap[rIdStr] || usersMap[rId];
-      const vObj = rec.voluntario_id ? (usersMap[String(rec.voluntario_id).trim()] || usersMap[rec.voluntario_id]) : null;
+      // Fallback 2: Se ainda for nulo, procurar se cleanFilhoId bate com algum usuário (ex: pai/mãe)
+      if (!fObj && fidStr && usersMap[fidStr] && filhosByParentMap[fidStr] && filhosByParentMap[fidStr].length > 0) {
+        fObj = filhosByParentMap[fidStr][0];
+      }
+
+      if (!rObj && rIdStr && usersMap[rIdStr]) {
+        rObj = usersMap[rIdStr];
+      }
+
+      const vId = rec.voluntario_id;
+      const vIdStr = vId ? String(vId).trim().toLowerCase() : '';
+      if (!vObj && vIdStr && usersMap[vIdStr]) {
+        vObj = usersMap[vIdStr];
+      }
+
+      // Determinar nome legível para a criança
+      const childNameFallback = fObj?.nome || (rObj?.nome ? `Filho(a) de ${rObj.nome}` : 'Criança');
 
       return {
         ...rec,
-        filho: fObj || { id: cleanFilhoId || rec.filho_id, nome: 'Criança' },
+        filho: fObj 
+          ? { ...fObj }
+          : { id: cleanFilhoId || rec.filho_id, nome: childNameFallback, responsavel_id: rId, selfie: rObj?.selfie || null },
         responsavel: rObj || { uid: rId, nome: 'Responsável' },
         voluntario: vObj || { uid: rec.voluntario_id, nome: 'Voluntário' }
       };
@@ -444,9 +490,9 @@ export const obterEstatisticasFilho = async (filhoId) => {
     };
   }
 
-  // Contar apenas DIAS/CULTOS ÚNICOS (mesmo se teve mais de uma entrada no mesmo dia)
+  // Contar apenas DIAS/CULTOS ÚNICOS em horário local (mesmo se teve mais de uma entrada no mesmo dia)
   const datasUnicas = new Set(
-    data.map(item => new Date(item.data_registro).toISOString().split('T')[0])
+    data.map(item => new Date(item.data_registro).toLocaleDateString('pt-BR'))
   );
   const totalCheckins = datasUnicas.size;
   

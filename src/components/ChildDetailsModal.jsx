@@ -61,28 +61,50 @@ export default function ChildDetailsModal({ child, parent, voluntarioId, onClose
       setLoading(true);
       try {
         // 1. Buscar dados completos da criança diretamente do banco
-        const { data: childDb } = await supabase
+        let { data: childDb } = await supabase
           .from('filhos')
           .select('*')
           .eq('id', targetChildId)
           .maybeSingle();
 
-        if (childDb) {
-          setFullChild(childDb);
-        }
-
         // 2. Buscar dados do responsável
         const parentId = childDb?.responsavel_id || child?.responsavel_id || parent?.uid;
+        let parentDb = null;
         if (parentId) {
-          const { data: parentDb } = await supabase
+          const { data: pDb } = await supabase
             .from('usuarios')
             .select('*')
             .eq('uid', parentId)
             .maybeSingle();
 
-          if (parentDb) {
-            setFullParent(parentDb);
+          if (pDb) {
+            parentDb = pDb;
+            setFullParent(pDb);
           }
+        }
+
+        // Fallback: Se a criança não foi encontrada pelo ID direto, buscar pelo responsavel_id
+        if (!childDb && parentId) {
+          const { data: kidsByParent } = await supabase
+            .from('filhos')
+            .select('*')
+            .eq('responsavel_id', parentId)
+            .limit(1);
+
+          if (kidsByParent && kidsByParent.length > 0) {
+            childDb = kidsByParent[0];
+          }
+        }
+
+        if (childDb) {
+          setFullChild(childDb);
+        } else {
+          // Garantir que fullChild não fique com valores genéricos se conhecemos o responsável
+          setFullChild(prev => ({
+            ...prev,
+            nome: prev?.nome && prev?.nome !== 'Criança' ? prev.nome : (parentDb?.nome ? `Filho(a) de ${parentDb.nome}` : (child?.nome || 'Criança')),
+            selfie: prev?.selfie || parentDb?.selfie || null
+          }));
         }
 
         // 3. Buscar estatísticas de presença
