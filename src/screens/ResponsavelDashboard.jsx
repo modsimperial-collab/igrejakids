@@ -3,6 +3,8 @@ import { useAuth } from '../context/AuthContext';
 import { 
   subscribeToChildren, 
   addChild, 
+  updateChild,
+  deleteChild,
   supabase, 
   subscribeToChamadasEmergenciaResponsavel, 
   atenderChamadaEmergencia, 
@@ -26,7 +28,8 @@ import {
   AlertTriangle,
   Bell,
   Check,
-  BookOpen
+  BookOpen,
+  Edit3
 } from 'lucide-react';
 import SocialWall from '../components/SocialWall';
 import SelfieCapture from '../components/SelfieCapture';
@@ -39,6 +42,18 @@ export default function ResponsavelDashboard({ user }) {
   const [activeEmergencies, setActiveEmergencies] = useState([]);
   const [diariosByChild, setDiariosByChild] = useState({});
   const [showAddForm, setShowAddForm] = useState(false);
+
+  // Estados de edição de filho
+  const [editingChild, setEditingChild] = useState(null);
+  const [editChildName, setEditChildName] = useState('');
+  const [editChildBirthdate, setEditChildBirthdate] = useState('');
+  const [editChildNickname, setEditChildNickname] = useState('');
+  const [editChildAlergias, setEditChildAlergias] = useState('');
+  const [editNeurodivergente, setEditNeurodivergente] = useState(false);
+  const [editNeurodivergenciaDetalhe, setEditNeurodivergenciaDetalhe] = useState('');
+  const [editComoAcalmar, setEditComoAcalmar] = useState('');
+  const [editChildSelfie, setEditChildSelfie] = useState(null);
+  const [savingChildEdit, setSavingChildEdit] = useState(false);
   const [childName, setChildName] = useState('');
   const [childBirthdate, setChildBirthdate] = useState('');
   const [childNickname, setChildNickname] = useState('');
@@ -185,8 +200,59 @@ export default function ResponsavelDashboard({ user }) {
       setTermoAceito(false);
       setChildSelfie(null);
       setShowAddForm(false);
-    } catch (error) {
-      alert('Erro ao cadastrar filho: ' + error.message);
+    } catch (err) {
+      alert('Erro ao cadastrar filho: ' + err.message);
+    }
+  };
+
+  const handleStartEditChild = (child) => {
+    setEditingChild(child);
+    setEditChildName(child.nome || '');
+    setEditChildBirthdate(child.data_nascimento || '');
+    setEditChildNickname(child.apelido || '');
+    setEditChildAlergias(child.alergias || '');
+    setEditNeurodivergente(!!child.neurodivergente);
+    setEditNeurodivergenciaDetalhe(child.neurodivergencia_detalhe || '');
+    setEditComoAcalmar(child.como_acalmar || '');
+    setEditChildSelfie(child.selfie || null);
+  };
+
+  const handleSaveChildEdit = async (e) => {
+    e.preventDefault();
+    if (!editChildName.trim()) {
+      alert('O nome da criança é obrigatório.');
+      return;
+    }
+    setSavingChildEdit(true);
+    try {
+      await updateChild(editingChild.id, {
+        nome: editChildName,
+        dataNascimento: editChildBirthdate,
+        apelido: editChildNickname,
+        neurodivergente: editNeurodivergente,
+        neurodivergenciaDetalhe: editNeurodivergente ? editNeurodivergenciaDetalhe : '',
+        comoAcalmar: editComoAcalmar,
+        alergias: editChildAlergias,
+        selfie: editChildSelfie
+      });
+      alert('Dados da criança atualizados com sucesso!');
+      setEditingChild(null);
+    } catch (err) {
+      alert('Erro ao atualizar criança: ' + err.message);
+    } finally {
+      setSavingChildEdit(false);
+    }
+  };
+
+  const handleDeleteChildClick = async (childId, name) => {
+    if (window.confirm(`Tem certeza que deseja excluir o cadastro de "${name}"?`)) {
+      try {
+        await deleteChild(childId);
+        alert('Cadastro de filho removido com sucesso!');
+        if (editingChild?.id === childId) setEditingChild(null);
+      } catch (err) {
+        alert('Erro ao excluir filho: ' + err.message);
+      }
     }
   };
 
@@ -566,14 +632,27 @@ export default function ResponsavelDashboard({ user }) {
                         )}
                       </div>
                     </div>
-                    <button 
-                      className="btn btn-primary" 
-                      onClick={() => setSelectedChild(selectedChild?.id === child.id ? null : child)}
-                      style={{ width: 'auto', padding: '0.5rem 0.75rem', fontSize: '0.8rem' }}
-                    >
-                      <QrCode size={14} />
-                      <span>{selectedChild?.id === child.id ? 'Fechar QR' : 'Gerar QR'}</span>
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                      <button 
+                        type="button"
+                        className="btn btn-secondary" 
+                        onClick={() => handleStartEditChild(child)}
+                        style={{ width: 'auto', padding: '0.45rem 0.65rem', fontSize: '0.78rem' }}
+                        title="Editar Ficha da Criança"
+                      >
+                        <Edit3 size={13} />
+                        <span>Editar</span>
+                      </button>
+                      <button 
+                        type="button"
+                        className="btn btn-primary" 
+                        onClick={() => setSelectedChild(selectedChild?.id === child.id ? null : child)}
+                        style={{ width: 'auto', padding: '0.45rem 0.65rem', fontSize: '0.78rem' }}
+                      >
+                        <QrCode size={13} />
+                        <span>{selectedChild?.id === child.id ? 'Fechar QR' : 'QR Code'}</span>
+                      </button>
+                    </div>
                   </div>
 
                   {/* QR Code display */}
@@ -836,6 +915,132 @@ export default function ResponsavelDashboard({ user }) {
         </>
       ) : (
         <SocialWall user={user} />
+      )}
+
+      {/* MODAL DE EDIÇÃO DE FILHO */}
+      {editingChild && (
+        <div className="modal-overlay" style={{ animation: 'fadeIn 0.2s ease-out' }}>
+          <div className="modal-content" style={{ maxWidth: '520px', width: '95%', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Edit3 className="accent-text" size={20} />
+                <h3 style={{ margin: 0, fontSize: '1.2rem' }}>Editar Dados de {editingChild.nome}</h3>
+              </div>
+              <button 
+                type="button"
+                className="btn-icon" 
+                onClick={() => setEditingChild(null)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveChildEdit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div className="form-group">
+                <label className="form-label">Foto / Selfie de Identificação</label>
+                <SelfieCapture 
+                  onCapture={(photoData) => setEditChildSelfie(photoData)} 
+                  initialImage={editChildSelfie}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Nome Completo da Criança *</label>
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  value={editChildName} 
+                  onChange={(e) => setEditChildName(e.target.value)} 
+                  required 
+                />
+              </div>
+
+              <div className="grid-2-col">
+                <div className="form-group">
+                  <label className="form-label">Data de Nascimento *</label>
+                  <input 
+                    type="date" 
+                    className="form-input" 
+                    value={editChildBirthdate} 
+                    onChange={(e) => setEditChildBirthdate(e.target.value)} 
+                    required 
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Apelido (opcional)</label>
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    value={editChildNickname} 
+                    onChange={(e) => setEditChildNickname(e.target.value)} 
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Alergias ou Restrições Alimentares</label>
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  placeholder="Ex: Leite, Amendoim, Nenhuma..."
+                  value={editChildAlergias} 
+                  onChange={(e) => setEditChildAlergias(e.target.value)} 
+                />
+              </div>
+
+              <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', fontWeight: 600 }}>
+                  <input 
+                    type="checkbox" 
+                    checked={editNeurodivergente} 
+                    onChange={(e) => setEditNeurodivergente(e.target.checked)} 
+                  />
+                  <span>A criança possui necessidades especiais ou neurodivergência? (ex: Autismo, TDAH)</span>
+                </label>
+
+                {editNeurodivergente && (
+                  <div style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <input 
+                      type="text" 
+                      className="form-input" 
+                      placeholder="Qual a condição / diagnóstico?"
+                      value={editNeurodivergenciaDetalhe} 
+                      onChange={(e) => setEditNeurodivergenciaDetalhe(e.target.value)} 
+                    />
+                    <textarea 
+                      className="form-input" 
+                      placeholder="Dicas para a equipe acalmar ou acolher a criança melhor..."
+                      value={editComoAcalmar} 
+                      onChange={(e) => setEditComoAcalmar(e.target.value)} 
+                      rows={2}
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <button 
+                  type="submit" 
+                  className="btn btn-primary" 
+                  disabled={savingChildEdit} 
+                  style={{ flex: 2 }}
+                >
+                  {savingChildEdit ? 'Salvando...' : 'Salvar Alterações'}
+                </button>
+                <button 
+                  type="button" 
+                  className="btn btn-secondary" 
+                  onClick={() => handleDeleteChildClick(editingChild.id, editingChild.nome)} 
+                  style={{ flex: 1, borderColor: '#ef4444', color: '#ef4444' }}
+                >
+                  <Trash2 size={16} />
+                  <span>Excluir</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
       {showEditProfile && (

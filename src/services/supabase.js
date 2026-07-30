@@ -213,6 +213,53 @@ export const addChild = async (responsavelId, { nome, dataNascimento, apelido, n
   return data[0];
 };
 
+export const updateChild = async (childId, { nome, dataNascimento, apelido, neurodivergente, neurodivergenciaDetalhe, comoAcalmar, alergias, selfie }) => {
+  let calculatedAge = 0;
+  if (dataNascimento) {
+    const birth = new Date(dataNascimento);
+    const today = new Date();
+    calculatedAge = today.getFullYear() - birth.getFullYear();
+    const m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+      calculatedAge--;
+    }
+  }
+
+  const updateData = {
+    nome,
+    idade: calculatedAge,
+    data_nascimento: dataNascimento || null,
+    apelido: apelido || '',
+    neurodivergente: !!neurodivergente,
+    neurodivergencia_detalhe: neurodivergente ? neurodivergenciaDetalhe : '',
+    como_acalmar: comoAcalmar || '',
+    alergias: alergias || ''
+  };
+
+  if (selfie) {
+    updateData.selfie = selfie;
+  }
+
+  const { data, error } = await supabase
+    .from('filhos')
+    .update(updateData)
+    .eq('id', childId)
+    .select();
+
+  if (error) throw new Error(error.message);
+  return data[0];
+};
+
+export const deleteChild = async (childId) => {
+  const { error } = await supabase
+    .from('filhos')
+    .delete()
+    .eq('id', childId);
+
+  if (error) throw new Error(error.message);
+  return true;
+};
+
 export const registrarPresenca = async (filhoId, responsavelId, voluntarioId) => {
   // 1. Buscar última transação de hoje para este filho
   const hojeInicio = new Date();

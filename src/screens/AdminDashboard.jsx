@@ -7,6 +7,8 @@ import {
   revokeVolunteer,
   subscribeToDailyAttendance,
   obterEstatisticasFilho,
+  getTodasEscalas,
+  criarEscala,
   supabase
 } from '../services/supabase';
 import { 
@@ -23,7 +25,9 @@ import {
   FileText,
   Megaphone,
   User,
-  Save
+  Save,
+  Calendar,
+  Plus
 } from 'lucide-react';
 import SocialWall from '../components/SocialWall';
 import SelfieCapture from '../components/SelfieCapture';
@@ -51,6 +55,56 @@ export default function AdminDashboard({ user }) {
   const [editMinisterio, setEditMinisterio] = useState('');
   const [editAntecedentes, setEditAntecedentes] = useState(null);
   const [savingUserEdit, setSavingUserEdit] = useState(false);
+
+  // Estados para Escala de Voluntários
+  const [escalas, setEscalas] = useState([]);
+  const [loadingEscalas, setLoadingEscalas] = useState(false);
+  const [escalaVoluntarioId, setEscalaVoluntarioId] = useState('');
+  const [escalaDataCulto, setEscalaDataCulto] = useState('');
+  const [escalaTurno, setEscalaTurno] = useState('Manhã');
+  const [escalaFuncao, setEscalaFuncao] = useState('Recepção / Cuidado');
+  const [savingEscala, setSavingEscala] = useState(false);
+
+  useEffect(() => {
+    fetchEscalas();
+  }, []);
+
+  const fetchEscalas = async () => {
+    setLoadingEscalas(true);
+    try {
+      const data = await getTodasEscalas();
+      setEscalas(data);
+    } catch (e) {
+      console.error("Erro ao buscar escalas:", e);
+    } finally {
+      setLoadingEscalas(false);
+    }
+  };
+
+  const handleCriarEscala = async (e) => {
+    e.preventDefault();
+    if (!escalaVoluntarioId || !escalaDataCulto) {
+      alert("Selecione um voluntário e informe a data do culto.");
+      return;
+    }
+    setSavingEscala(true);
+    try {
+      await criarEscala({
+        voluntarioId: escalaVoluntarioId,
+        dataCulto: escalaDataCulto,
+        turno: escalaTurno,
+        funcao: escalaFuncao
+      });
+      alert("Escala criada com sucesso!");
+      setEscalaVoluntarioId('');
+      setEscalaDataCulto('');
+      fetchEscalas();
+    } catch (err) {
+      alert("Erro ao criar escala: " + err.message);
+    } finally {
+      setSavingEscala(false);
+    }
+  };
 
   const startEditing = () => {
     if (!selectedUser) return;
@@ -342,6 +396,13 @@ export default function AdminDashboard({ user }) {
           <span>Presentes Hoje ({presentCount})</span>
         </button>
         <button 
+          className={`tab-btn ${activeTab === 'escala' ? 'active' : ''}`}
+          onClick={() => setActiveTab('escala')}
+        >
+          <Calendar size={16} />
+          <span>Escala de Serviço ({escalas.length})</span>
+        </button>
+        <button 
           className={`tab-btn ${activeTab === 'mural' ? 'active' : ''}`}
           onClick={() => setActiveTab('mural')}
         >
@@ -351,7 +412,144 @@ export default function AdminDashboard({ user }) {
       </div>
 
       {/* Volunteers/Mural Content Section */}
-      {activeTab === 'mural' ? (
+      {activeTab === 'escala' ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', marginTop: '1rem' }}>
+          {/* Formulário de Criação de Escala */}
+          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '14px', padding: '1.25rem' }}>
+            <h3 className="heading-font" style={{ margin: '0 0 1rem 0', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--accent-primary)' }}>
+              <Plus size={18} />
+              <span>Escalar Voluntário para o Culto</span>
+            </h3>
+
+            <form onSubmit={handleCriarEscala} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div className="grid-2-col">
+                <div className="form-group">
+                  <label className="form-label">Selecione o Voluntário *</label>
+                  <select 
+                    className="form-input" 
+                    value={escalaVoluntarioId} 
+                    onChange={(e) => setEscalaVoluntarioId(e.target.value)}
+                    required
+                  >
+                    <option value="">-- Selecione um Voluntário Ativo --</option>
+                    {activeVolunteers.map(vol => (
+                      <option key={vol.uid} value={vol.uid}>
+                        {vol.nome} ({vol.ministerio || 'Voluntário'})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Data do Culto *</label>
+                  <input 
+                    type="date" 
+                    className="form-input" 
+                    value={escalaDataCulto} 
+                    onChange={(e) => setEscalaDataCulto(e.target.value)} 
+                    required 
+                  />
+                </div>
+              </div>
+
+              <div className="grid-2-col">
+                <div className="form-group">
+                  <label className="form-label">Turno do Culto</label>
+                  <select 
+                    className="form-input" 
+                    value={escalaTurno} 
+                    onChange={(e) => setEscalaTurno(e.target.value)}
+                  >
+                    <option value="Manhã">Manhã</option>
+                    <option value="Noite">Noite</option>
+                    <option value="Tarde">Tarde</option>
+                    <option value="Especial">Culto Especial</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Função / Ministério</label>
+                  <select 
+                    className="form-input" 
+                    value={escalaFuncao} 
+                    onChange={(e) => setEscalaFuncao(e.target.value)}
+                  >
+                    <option value="Recepção / Cuidado">Recepção / Cuidado</option>
+                    <option value="Pregação Infantil">Pregação Infantil</option>
+                    <option value="Louvor Infantil">Louvor Infantil</option>
+                    <option value="Teatrinho / Animação">Teatrinho / Animação</option>
+                    <option value="Apoio Geral">Apoio Geral</option>
+                  </select>
+                </div>
+              </div>
+
+              <button 
+                type="submit" 
+                className="btn btn-primary" 
+                disabled={savingEscala}
+                style={{ width: '100%', marginTop: '0.5rem', padding: '0.75rem', justifyContent: 'center' }}
+              >
+                {savingEscala ? 'Adicionando à Escala...' : 'Cadastrar na Escala'}
+              </button>
+            </form>
+          </div>
+
+          {/* Lista de Escalas */}
+          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '14px', padding: '1.25rem' }}>
+            <h3 className="heading-font" style={{ margin: '0 0 1rem 0', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Calendar size={18} style={{ color: 'var(--accent-primary)' }} />
+              <span>Quadro Geral de Escalas</span>
+            </h3>
+
+            {loadingEscalas ? (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '2rem' }}><div className="spinner"></div></div>
+            ) : escalas.length === 0 ? (
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontStyle: 'italic', margin: 0 }}>
+                Nenhuma escala cadastrada no momento. Preencha o formulário acima para agendar voluntários!
+              </p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {escalas.map(item => (
+                  <div 
+                    key={item.id} 
+                    style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'center', 
+                      background: 'rgba(255, 255, 255, 0.02)', 
+                      border: '1px solid var(--border-color)', 
+                      borderRadius: '10px', 
+                      padding: '0.85rem 1rem' 
+                    }}
+                  >
+                    <div>
+                      <strong style={{ color: '#fff', fontSize: '0.95rem', display: 'block' }}>
+                        {item.voluntario?.nome || 'Voluntário'}
+                      </strong>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                        Data: <strong>{new Date(item.data_culto + 'T00:00:00').toLocaleDateString('pt-BR')}</strong> ({item.turno}) • Função: <strong>{item.funcao}</strong>
+                      </span>
+                    </div>
+
+                    {item.solicitou_troca && (
+                      <div style={{ textAlign: 'right' }}>
+                        <span style={{ fontSize: '0.75rem', background: 'rgba(245, 158, 11, 0.2)', color: '#fbbf24', padding: '0.25rem 0.6rem', borderRadius: '6px', fontWeight: 600, display: 'inline-block' }}>
+                          ⚠️ Pediu Troca de Turno
+                        </span>
+                        {item.observacao_troca && (
+                          <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block', marginTop: '0.2rem' }}>
+                            Motivo: {item.observacao_troca}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : activeTab === 'mural' ? (
         <div style={{ marginTop: '1rem' }}>
           <SocialWall user={user} />
         </div>
