@@ -388,6 +388,20 @@ export default function AdminDashboard({ user }) {
     }
   };
 
+  const handleExcluirCadastro = async (uid) => {
+    if (window.confirm('Deseja realmente EXCLUIR DEFINITIVAMENTE este cadastro? Esta ação é irreversível e removerá o usuário do sistema.')) {
+      try {
+        await rejectVolunteer(uid);
+        if (selectedUser?.uid === uid) {
+          setSelectedUser(null);
+        }
+        alert('Cadastro excluído com sucesso!');
+      } catch (error) {
+        alert('Erro ao excluir cadastro: ' + error.message);
+      }
+    }
+  };
+
   const handleSignOut = async () => {
     try {
       await signOut();
@@ -1239,6 +1253,14 @@ export default function AdminDashboard({ user }) {
                       <UserX size={14} />
                       <span>Revogar Acesso</span>
                     </button>
+                    <button 
+                      className="btn btn-danger" 
+                      onClick={() => handleExcluirCadastro(vol.uid)} 
+                      style={{ padding: '6px 12px', fontSize: '0.75rem' }}
+                    >
+                      <Trash2 size={14} />
+                      <span>Excluir</span>
+                    </button>
                   </div>
                 </div>
               ))
@@ -1715,18 +1737,17 @@ export default function AdminDashboard({ user }) {
                     )}
                   </div>
 
-                  {!selectedUser.aprovado && (
-                    <button 
-                      className="btn btn-danger" 
-                      onClick={() => {
-                        handleReject(selectedUser.uid);
-                        closeUserModal();
-                      }} 
-                      style={{ width: '100%' }}
-                    >
-                      Recusar Conta
-                    </button>
-                  )}
+                  <button 
+                    className="btn btn-danger" 
+                    onClick={() => {
+                      handleExcluirCadastro(selectedUser.uid);
+                      closeUserModal();
+                    }} 
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
+                  >
+                    <Trash2 size={16} />
+                    <span>Excluir Cadastro Definitivamente</span>
+                  </button>
 
                   <button className="btn btn-secondary" onClick={closeUserModal} style={{ width: '100%' }}>
                     Fechar Ficha

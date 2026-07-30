@@ -61,6 +61,33 @@ export default function VolunteerDashboard({ user }) {
     return () => unsubscribe();
   }, []);
 
+  // Estado para armazenar estatísticas de presenças de cada filho indexado por ID
+  const [childrenStats, setChildrenStats] = useState({});
+
+  useEffect(() => {
+    if (attendanceRecords.length === 0) return;
+    const childIds = [...new Set(attendanceRecords.map(log => log.filho?.id).filter(Boolean))];
+    const fetchStats = async () => {
+      const newStats = { ...childrenStats };
+      let updated = false;
+      for (const id of childIds) {
+        if (!newStats[id]) {
+          try {
+            const stats = await obterEstatisticasFilho(id);
+            newStats[id] = stats;
+            updated = true;
+          } catch (e) {
+            console.error("Erro ao obter estatísticas para o filho:", id, e);
+          }
+        }
+      }
+      if (updated) {
+        setChildrenStats(newStats);
+      }
+    };
+    fetchStats();
+  }, [attendanceRecords]);
+
   // Calcular lista de crianças que estão atualmente EM SUPERVISÃO (último registro hoje foi 'entrada')
   const presentChildren = React.useMemo(() => {
     const mapByChild = new Map();
@@ -713,12 +740,14 @@ export default function VolunteerDashboard({ user }) {
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.85rem' }}>
               {filteredChildren.map(item => {
-                const child = item.filho;
-                const parent = item.responsavel;
+                const child = item.filho || { nome: 'Criança' };
+                const parent = item.responsavel || { nome: 'Responsável' };
+                const vol = item.voluntario || { nome: 'Voluntário' };
                 const checkInDate = new Date(item.data_registro);
+                const stats = childrenStats[child.id];
 
                 // Formatar link do WhatsApp
-                const msgWpp = encodeURIComponent(`Olá, ${parent?.nome || 'Responsável'}! Sou voluntário(a) da Igreja da Criança AD Madureira e estou com o(a) ${child?.nome}.`);
+                const msgWpp = encodeURIComponent(`Olá, ${parent?.nome || 'Responsável'}! Sou voluntário(a) da Igreja da Criança AD Madureira e estou com o(a) ${child?.nome || 'sua criança'}.`);
                 const wppLink = parent?.telefone ? `https://wa.me/55${parent.telefone.replace(/\D/g, '')}?text=${msgWpp}` : null;
 
                 return (
@@ -728,71 +757,94 @@ export default function VolunteerDashboard({ user }) {
                     flexDirection: 'column',
                     gap: '0.75rem',
                     border: child?.neurodivergente ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid rgba(255, 255, 255, 0.08)',
+                    background: 'var(--bg-card)',
+                    borderRadius: '12px',
                     position: 'relative'
                   }}>
-                    {/* Top Info Criança */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-                      {child?.selfie ? (
-                        <img 
-                          src={child.selfie} 
-                          alt={child.nome} 
-                          style={{
-                            width: '56px',
-                            height: '56px',
+                    {/* Top Row: Avatar + Info + Badge Entrada */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flex: 1, minWidth: 0 }}>
+                        {child?.selfie ? (
+                          <img 
+                            src={child.selfie} 
+                            alt={child.nome} 
+                            style={{
+                              width: '46px',
+                              height: '46px',
+                              borderRadius: '50%',
+                              objectFit: 'cover',
+                              border: '2px solid var(--accent-primary)',
+                              flexShrink: 0
+                            }}
+                          />
+                        ) : (
+                          <div style={{
+                            width: '46px',
+                            height: '46px',
                             borderRadius: '50%',
-                            objectFit: 'cover',
-                            border: '2px solid var(--accent-primary)',
+                            background: 'rgba(255, 255, 255, 0.05)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            border: '1px dashed rgba(255,255,255,0.15)',
                             flexShrink: 0
-                          }}
-                        />
-                      ) : (
-                        <div style={{
-                          width: '56px',
-                          height: '56px',
-                          borderRadius: '50%',
-                          background: 'rgba(255, 255, 255, 0.05)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0
-                        }}>
-                          <User size={24} style={{ color: 'var(--text-secondary)' }} />
-                        </div>
-                      )}
+                          }}>
+                            <User size={20} style={{ color: 'var(--text-secondary)' }} />
+                          </div>
+                        )}
 
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                          <strong style={{ fontSize: '0.95rem', color: '#fff' }}>{child?.nome}</strong>
-                          {child?.apelido && (
-                            <span style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', fontWeight: 600 }}>
-                              ("{child.apelido}")
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                            <strong style={{ fontSize: '0.95rem', color: '#fff' }}>{child?.nome}</strong>
+                            {child?.apelido && (
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.05)', padding: '1px 6px', borderRadius: '4px' }}>
+                                ({child.apelido})
+                              </span>
+                            )}
+                            {child?.neurodivergente && (
+                              <span style={{ 
+                                fontSize: '0.7rem', 
+                                background: 'rgba(245, 158, 11, 0.15)', 
+                                color: '#f59e0b', 
+                                padding: '1px 6px', 
+                                borderRadius: '4px',
+                                fontWeight: 600
+                              }}>
+                                {child.neurodivergencia_detalhe || 'Neurodivergente'}
+                              </span>
+                            )}
+                          </div>
+
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginTop: '2px' }}>
+                            Responsável: <strong style={{ color: '#fff' }}>{parent?.nome || 'Não cadastrado'}</strong>
+                          </span>
+
+                          {stats && (
+                            <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block', marginTop: '1px' }}>
+                              Frequência: <strong style={{ color: '#fff' }}>{stats.totalCheckins} cultos</strong>
                             </span>
                           )}
                         </div>
+                      </div>
 
-                        <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '2px' }}>
-                          <Clock size={12} /> Check-In às {checkInDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                      {/* Status Badge */}
+                      <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.2rem', flexShrink: 0 }}>
+                        <span style={{
+                          fontSize: '0.7rem',
+                          fontWeight: 600,
+                          padding: '2px 8px',
+                          borderRadius: '10px',
+                          background: 'rgba(16, 185, 129, 0.15)',
+                          color: '#10b981'
+                        }}>
+                          Entrada
+                        </span>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                          <Clock size={11} />
+                          {checkInDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
                     </div>
-
-                    {/* Destaque Neurodivergência */}
-                    {child?.neurodivergente && (
-                      <div style={{
-                        background: 'rgba(245, 158, 11, 0.15)',
-                        border: '1px solid rgba(245, 158, 11, 0.3)',
-                        color: '#fbbf24',
-                        padding: '0.45rem 0.65rem',
-                        borderRadius: '8px',
-                        fontSize: '0.75rem',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.35rem'
-                      }}>
-                        <Sparkles size={14} style={{ flexShrink: 0 }} />
-                        <span><strong>Neurodivergente:</strong> {child.neurodivergencia_detalhe || 'Ver detalhes na ficha'}</span>
-                      </div>
-                    )}
 
                     {/* Destaque Como Acalmar se existir */}
                     {child?.como_acalmar && (
@@ -805,11 +857,11 @@ export default function VolunteerDashboard({ user }) {
                         fontSize: '0.75rem',
                         lineHeight: '1.35'
                       }}>
-                        <strong>💡 Como acalmar a criança:</strong> "{child.como_acalmar}"
+                        <strong>💡 Como acalmar:</strong> "{child.como_acalmar}"
                       </div>
                     )}
 
-                    {/* Rodapé do Card com Ações (WhatsApp + Abrir Ficha) */}
+                    {/* Rodapé do Card com Ações (Registrado Por + WhatsApp + Ver Ficha) */}
                     <div style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -819,12 +871,9 @@ export default function VolunteerDashboard({ user }) {
                       gap: '0.5rem',
                       flexWrap: 'wrap'
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flex: 1, minWidth: '160px' }}>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Resp:</span>
-                        <strong style={{ fontSize: '0.75rem', color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {parent?.nome || 'Desconhecido'}
-                        </strong>
-                      </div>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                        Registrado por: <strong style={{ color: 'var(--text-primary)' }}>{vol?.nome || 'Voluntário'}</strong>
+                      </span>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                         {wppLink && (
@@ -833,10 +882,11 @@ export default function VolunteerDashboard({ user }) {
                             target="_blank"
                             rel="noopener noreferrer"
                             style={{
-                              background: '#10b981',
-                              color: '#fff',
-                              padding: '6px 10px',
-                              borderRadius: '8px',
+                              background: 'rgba(16, 185, 129, 0.1)',
+                              border: '1px solid rgba(16, 185, 129, 0.25)',
+                              color: '#10b981',
+                              padding: '5px 10px',
+                              borderRadius: '6px',
                               textDecoration: 'none',
                               fontSize: '0.75rem',
                               fontWeight: 600,
@@ -845,7 +895,7 @@ export default function VolunteerDashboard({ user }) {
                               gap: '0.3rem'
                             }}
                           >
-                            <MessageCircle size={14} />
+                            <MessageCircle size={13} />
                             <span>WhatsApp</span>
                           </a>
                         )}
@@ -853,9 +903,9 @@ export default function VolunteerDashboard({ user }) {
                         <button
                           onClick={() => setSelectedChildModal({ child, parent })}
                           className="btn btn-secondary"
-                          style={{ padding: '6px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                          style={{ padding: '5px 10px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
                         >
-                          <FileText size={14} />
+                          <FileText size={13} />
                           <span>Ver Ficha</span>
                         </button>
                       </div>

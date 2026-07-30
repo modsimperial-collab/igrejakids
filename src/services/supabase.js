@@ -350,7 +350,11 @@ export const subscribeToDailyAttendance = (callback) => {
           filhosMap[f.id] = f;
           filhosMap[String(f.id)] = f;
         });
-      } else {
+      }
+      
+      // Fallback: se algum ID não foi encontrado no map, buscar todos os filhos
+      const missingIds = filhoIds.filter(id => !filhosMap[id] && !filhosMap[String(id)]);
+      if (missingIds.length > 0) {
         const { data: allF } = await supabase.from('filhos').select('*');
         if (allF) {
           allF.forEach(f => {
@@ -362,7 +366,7 @@ export const subscribeToDailyAttendance = (callback) => {
     }
 
     // Buscar dados completos dos responsáveis e voluntários
-    const { data: uData } = await supabase.from('usuarios').select('uid, nome, telefone');
+    const { data: uData } = await supabase.from('usuarios').select('*');
     if (uData && uData.length > 0) {
       uData.forEach(u => {
         usersMap[u.uid] = u;
