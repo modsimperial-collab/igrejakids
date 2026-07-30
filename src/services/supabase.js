@@ -320,66 +320,48 @@ export const subscribeToDailyAttendance = (callback) => {
   const vinteEQuatroHorasAtras = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
   const fetchAttendance = async () => {
-    // 1. Tentar busca principal com relações (joins)
-    let { data, error } = await supabase
+    // Buscar registros de presença das últimas 24 horas
+    const { data: rawData, error } = await supabase
       .from('registro_presencas')
-      .select(`
-        id,
-        filho_id,
-        responsavel_id,
-        voluntario_id,
-        tipo_transacao,
-        data_registro,
-        filho:filho_id(id, nome, data_nascimento, apelido, neurodivergente, neurodivergencia_detalhe, como_acalmar, alergias, selfie),
-        responsavel:responsavel_id(uid, nome, telefone),
-        voluntario:voluntario_id(uid, nome)
-      `)
+      .select('*')
       .gte('data_registro', vinteEQuatroHorasAtras.toISOString())
       .order('data_registro', { ascending: false });
 
-    // 2. Se a busca com relacionamento falhou (por exemplo, se as FKs não existem no banco), faz a busca simples
-    if (error || !data) {
-      const { data: rawData } = await supabase
-        .from('registro_presencas')
-        .select('*')
-        .gte('data_registro', vinteEQuatroHorasAtras.toISOString())
-        .order('data_registro', { ascending: false });
-
-      data = rawData || [];
-    }
-
-    if (data && data.length > 0) {
-      // Garantir resolução dos objetos de filho, responsavel e voluntario caso o join automático do Supabase retorne null
-      const missingFilhoIds = [...new Set(data.filter(r => !r.filho && r.filho_id).map(r => r.filho_id))];
-      const missingUserIds = [...new Set([
-        ...data.filter(r => !r.responsavel && r.responsavel_id).map(r => r.responsavel_id),
-        ...data.filter(r => !r.voluntario && r.voluntario_id).map(r => r.voluntario_id)
-      ])];
-
-      let filhosMap = {};
-      let usersMap = {};
-
-      if (missingFilhoIds.length > 0) {
-        const { data: fData } = await supabase.from('filhos').select('*').in('id', missingFilhoIds);
-        if (fData) fData.forEach(f => { filhosMap[f.id] = f; });
-      }
-
-      if (missingUserIds.length > 0) {
-        const { data: uData } = await supabase.from('usuarios').select('uid, nome, telefone').in('uid', missingUserIds);
-        if (uData) uData.forEach(u => { usersMap[u.uid] = u; });
-      }
-
-      const formatted = data.map(rec => ({
-        ...rec,
-        filho: rec.filho || filhosMap[rec.filho_id] || { id: rec.filho_id, nome: 'Criança' },
-        responsavel: rec.responsavel || usersMap[rec.responsavel_id] || { uid: rec.responsavel_id, nome: 'Responsável' },
-        voluntario: rec.voluntario || usersMap[rec.voluntario_id] || { uid: rec.voluntario_id, nome: 'Voluntário' }
-      }));
-
-      callback(formatted);
-    } else {
+    if (error || !rawData || rawData.length === 0) {
       callback([]);
+      return;
     }
+
+    // Coletar todos os IDs de filhos e usuários únicos envolvidos
+    const filhoIds = [...new Set(rawData.map(r => r.filho_id).filter(Boolean))];
+    const userIds = [...new Set([
+      ...rawData.map(r => r.responsavel_id).filter(Boolean),
+      ...rawData.map(r => r.voluntario_id).filter(Boolean)
+    ])];
+
+    let filhosMap = {};
+    let usersMap = {};
+
+    // Buscar dados completos das crianças (nome, selfie, alergias, neurodivergências, etc.)
+    if (filhoIds.length > 0) {
+      const { data: fData } = await supabase.from('filhos').select('*').in('id', filhoIds);
+      if (fData) fData.forEach(f => { filhosMap[f.id] = f; });
+    }
+
+    // Buscar dados completos dos responsáveis e voluntários (nome, telefone)
+    if (userIds.length > 0) {
+      const { data: uData } = await supabase.from('usuarios').select('uid, nome, telefone').in('uid', userIds);
+      if (uData) uData.forEach(u => { usersMap[u.uid] = u; });
+    }
+
+    const formatted = rawData.map(rec => ({
+      ...rec,
+      filho: filhosMap[rec.filho_id] || { id: rec.filho_id, nome: 'Criança' },
+      responsavel: usersMap[rec.responsavel_id] || { uid: rec.responsavel_id, nome: 'Responsável' },
+      voluntario: usersMap[rec.voluntario_id] || { uid: rec.voluntario_id, nome: 'Voluntário' }
+    }));
+
+    callback(formatted);
   };
 
   fetchAttendance();

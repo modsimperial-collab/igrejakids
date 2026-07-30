@@ -27,7 +27,18 @@ import {
   User,
   Save,
   Calendar,
-  Plus
+  Plus,
+  QrCode,
+  Heart,
+  ShieldCheck,
+  Smartphone,
+  BookOpen,
+  MessageSquare,
+  Activity,
+  Layers,
+  Award,
+  CheckCircle2,
+  Zap
 } from 'lucide-react';
 import SocialWall from '../components/SocialWall';
 import SelfieCapture from '../components/SelfieCapture';
@@ -409,6 +420,14 @@ export default function AdminDashboard({ user }) {
           <Megaphone size={16} />
           <span>Mural de Mídia</span>
         </button>
+        <button 
+          className={`tab-btn ${activeTab === 'funcionalidades' ? 'active' : ''}`}
+          onClick={() => setActiveTab('funcionalidades')}
+          style={activeTab === 'funcionalidades' ? { background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.25) 0%, rgba(168, 85, 247, 0.25) 100%)', borderColor: '#a855f7' } : {}}
+        >
+          <Sparkles size={16} style={{ color: '#c084fc' }} />
+          <span>Guia de Recursos</span>
+        </button>
       </div>
 
       {/* Volunteers/Mural Content Section */}
@@ -552,6 +571,246 @@ export default function AdminDashboard({ user }) {
       ) : activeTab === 'mural' ? (
         <div style={{ marginTop: '1rem' }}>
           <SocialWall user={user} />
+        </div>
+      ) : activeTab === 'funcionalidades' ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginTop: '1rem' }}>
+          {/* Header do Guia */}
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(168, 85, 247, 0.15) 100%)',
+            border: '1px solid rgba(168, 85, 247, 0.3)',
+            borderRadius: '16px',
+            padding: '1.5rem',
+            position: 'relative',
+            overflow: 'hidden'
+          }}>
+            <div style={{ position: 'relative', zIndex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
+                <div style={{ background: 'linear-gradient(135deg, #a855f7 0%, #6366f1 100%)', padding: '0.4rem 0.75rem', borderRadius: '20px', display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#fff', fontSize: '0.75rem', fontWeight: 700 }}>
+                  <Sparkles size={14} />
+                  <span>Manual de Recursos & Módulos</span>
+                </div>
+                <span style={{ fontSize: '0.75rem', color: '#10b981', background: 'rgba(16, 185, 129, 0.15)', padding: '0.2rem 0.6rem', borderRadius: '12px', fontWeight: 600 }}>
+                  ● Sistema 100% Operacional
+                </span>
+              </div>
+              <h2 className="heading-font" style={{ fontSize: '1.4rem', color: '#fff', margin: '0 0 0.4rem 0' }}>
+                Mapa de Funcionalidades do Igreja Kids
+              </h2>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0, maxWidth: '680px', lineHeight: 1.5 }}>
+                Visão geral interativa com todas as 16 ferramentas integradas ao aplicativo para Pais, Voluntários e Liderança da AD Madureira.
+              </p>
+
+              {/* Resumo de Contadores */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem', marginTop: '1.25rem' }}>
+                <div style={{ background: 'rgba(255, 255, 255, 0.04)', padding: '0.75rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Módulo Pais</span>
+                  <strong style={{ fontSize: '1.1rem', color: '#f472b6' }}>6 Recursos</strong>
+                </div>
+                <div style={{ background: 'rgba(255, 255, 255, 0.04)', padding: '0.75rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Módulo Voluntários</span>
+                  <strong style={{ fontSize: '1.1rem', color: '#a5b4fc' }}>5 Recursos</strong>
+                </div>
+                <div style={{ background: 'rgba(255, 255, 255, 0.04)', padding: '0.75rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Módulo Admin Mestre</span>
+                  <strong style={{ fontSize: '1.1rem', color: '#fbbf24' }}>5 Recursos</strong>
+                </div>
+                <div style={{ background: 'rgba(255, 255, 255, 0.04)', padding: '0.75rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>Comunicação & Mídia</span>
+                  <strong style={{ fontSize: '1.1rem', color: '#38bdf8' }}>3 Recursos</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* SEÇÃO 1: PAIS / RESPONSÁVEIS */}
+          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '14px', padding: '1.25rem' }}>
+            <h3 className="heading-font" style={{ margin: '0 0 1rem 0', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#f472b6' }}>
+              <User size={20} />
+              <span>1. Módulo do Responsável (Pais / Tutores)</span>
+            </h3>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.85rem' }}>
+              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px', padding: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                  <QrCode size={18} style={{ color: 'var(--accent-primary)' }} />
+                  <strong style={{ color: '#fff', fontSize: '0.9rem' }}>Etiqueta Digital & QR Code Próprio</strong>
+                </div>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
+                  Cada filho cadastrado recebe automaticamente um QR Code individual no celular dos pais para dar entrada e saída rápida no ministério.
+                </p>
+              </div>
+
+              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px', padding: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                  <User size={18} style={{ color: '#38bdf8' }} />
+                  <strong style={{ color: '#fff', fontSize: '0.9rem' }}>Ficha Completa & Selfie da Criança</strong>
+                </div>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
+                  Permite cadastrar foto (selfie), apelido carinhoso, data de nascimento e cálculo automático de idade para a identificação da sala correta.
+                </p>
+              </div>
+
+              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px', padding: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                  <Heart size={18} style={{ color: '#f43f5e' }} />
+                  <strong style={{ color: '#fff', fontSize: '0.9rem' }}>Ficha de Alergias & Restrições</strong>
+                </div>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
+                  Campo dedicado para alergias alimentares ou de medicação, garantindo a segurança da criança na hora do lanche.
+                </p>
+              </div>
+
+              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px', padding: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                  <Sparkles size={18} style={{ color: '#fbbf24' }} />
+                  <strong style={{ color: '#fff', fontSize: '0.9rem' }}>Inclusão & Neurodivergência</strong>
+                </div>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
+                  Identificação para Autismo (TEA), TDAH, etc., além das instruções personalizadas de <em>"Como acalmar a criança durante uma crise"</em>.
+                </p>
+              </div>
+
+              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px', padding: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                  <ShieldCheck size={18} style={{ color: '#10b981' }} />
+                  <strong style={{ color: '#fff', fontSize: '0.9rem' }}>Controle de Retirada (Autorizados)</strong>
+                </div>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
+                  Cadastro de avós, tios ou terceiros autorizados a buscar a criança, com foto (selfie), documento (RG/CPF) e WhatsApp.
+                </p>
+              </div>
+
+              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px', padding: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                  <FileText size={18} style={{ color: '#a855f7' }} />
+                  <strong style={{ color: '#fff', fontSize: '0.9rem' }}>Autonomia de Edição & Atualização</strong>
+                </div>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
+                  Os pais podem editar dados dos filhos, mudar fotos e adicionar novas alergias a qualquer momento direto pelo seu aplicativo.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* SEÇÃO 2: VOLUNTÁRIOS & OPERACIONAL */}
+          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '14px', padding: '1.25rem' }}>
+            <h3 className="heading-font" style={{ margin: '0 0 1rem 0', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#a5b4fc' }}>
+              <Smartphone size={20} />
+              <span>2. Módulo do Voluntário (Check-In & Recepção)</span>
+            </h3>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.85rem' }}>
+              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px', padding: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                  <Smartphone size={18} style={{ color: '#6366f1' }} />
+                  <strong style={{ color: '#fff', fontSize: '0.9rem' }}>Leitor da Câmera por QR Code</strong>
+                </div>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
+                  Scanner integrado para câmera de celular ou tablet, permitindo realizar o check-in de dezenas de crianças em segundos.
+                </p>
+              </div>
+
+              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px', padding: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                  <Zap size={18} style={{ color: '#fbbf24' }} />
+                  <strong style={{ color: '#fff', fontSize: '0.9rem' }}>Check-In & Check-Out Inteligente (24h)</strong>
+                </div>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
+                  Alternância automática entre Entrada e Saída ao ler o código da criança, com confirmação visual destacada em verde/laranja.
+                </p>
+              </div>
+
+              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px', padding: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                  <Users size={18} style={{ color: '#10b981' }} />
+                  <strong style={{ color: '#fff', fontSize: '0.9rem' }}>Aba "Crianças sob Supervisão"</strong>
+                </div>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
+                  Lista ao vivo de quem está presente na sala infantil durante o culto, com busca instantânea por nome da criança ou responsável.
+                </p>
+              </div>
+
+              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px', padding: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                  <BookOpen size={18} style={{ color: '#38bdf8' }} />
+                  <strong style={{ color: '#fff', fontSize: '0.9rem' }}>Diário de Bordo & Registros do Culto</strong>
+                </div>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
+                  Permite anotar tags rápidas (Ex: <em>"Lanchou bem"</em>, <em>"Participou da história"</em>, <em>"Chorou"</em>) para manter o histórico pastoral da criança.
+                </p>
+              </div>
+
+              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px', padding: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                  <MessageSquare size={18} style={{ color: '#25d366' }} />
+                  <strong style={{ color: '#fff', fontSize: '0.9rem' }}>Chamada de Emergência via WhatsApp</strong>
+                </div>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
+                  Em caso de choro prolongado ou necessidade médica, o voluntário clica no botão e abre o WhatsApp do pai com texto pronto.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* SEÇÃO 3: LIDERANÇA & ADMINISTRAÇÃO MESTRE */}
+          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '14px', padding: '1.25rem' }}>
+            <h3 className="heading-font" style={{ margin: '0 0 1rem 0', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#fbbf24' }}>
+              <ShieldAlert size={20} />
+              <span>3. Módulo do Administrador Mestre (Liderança)</span>
+            </h3>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.85rem' }}>
+              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px', padding: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                  <UserCheck size={18} style={{ color: '#10b981' }} />
+                  <strong style={{ color: '#fff', fontSize: '0.9rem' }}>Aprovação & Segurança de Voluntários</strong>
+                </div>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
+                  Controle estrito de novos voluntários: validação de certidão de antecedentes criminais, selfie, ministério e aprovação/recusa em 1 clique.
+                </p>
+              </div>
+
+              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px', padding: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                  <Calendar size={18} style={{ color: 'var(--accent-primary)' }} />
+                  <strong style={{ color: '#fff', fontSize: '0.9rem' }}>Gestão de Escala de Serviço & Trocas</strong>
+                </div>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
+                  Agendamento de voluntários por data de culto, turno e função (Recepção, Cuidador, Professor), com alerta para solicitações de troca de turno.
+                </p>
+              </div>
+
+              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px', padding: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                  <Activity size={18} style={{ color: '#38bdf8' }} />
+                  <strong style={{ color: '#fff', fontSize: '0.9rem' }}>Estatísticas de Frequência & Alertas</strong>
+                </div>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
+                  Contagem automatizada por cultos únicos frequentados e alerta amarelo automático para crianças ausentes há mais de 30 dias.
+                </p>
+              </div>
+
+              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px', padding: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                  <Megaphone size={18} style={{ color: '#f472b6' }} />
+                  <strong style={{ color: '#fff', fontSize: '0.9rem' }}>Mural de Mídia (Social Wall)</strong>
+                </div>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
+                  Feed oficial para publicar fotos de eventos, avisos do ministério infantil para toda a igreja e abrir espaço para comentários.
+                </p>
+              </div>
+
+              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px', padding: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                  <Layers size={18} style={{ color: '#c084fc' }} />
+                  <strong style={{ color: '#fff', fontSize: '0.9rem' }}>Edição Master & Gerenciamento de Dados</strong>
+                </div>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.4 }}>
+                  Acesso completo para alterar nomes, telefones, endereços, revogar voluntários e gerenciar o cadastro de qualquer membro.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       ) : activeTab === 'presencas' ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
