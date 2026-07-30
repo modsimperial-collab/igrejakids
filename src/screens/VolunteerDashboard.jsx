@@ -28,7 +28,7 @@ import EditProfileModal from '../components/EditProfileModal';
 import ChildDetailsModal from '../components/ChildDetailsModal';
 import ExpressCheckinModal from '../components/ExpressCheckinModal';
 import VolunteerScheduleModal from '../components/VolunteerScheduleModal';
-import { supabase, registrarPresenca, obterEstatisticasFilho, subscribeToDailyAttendance } from '../services/supabase';
+import { supabase, registrarPresenca, obterEstatisticasFilho } from '../services/supabase';
 
 export default function VolunteerDashboard({ user }) {
   const { signOut } = useAuth();
@@ -40,7 +40,7 @@ export default function VolunteerDashboard({ user }) {
   const [cameraError, setCameraError] = useState('');
   const qrScannerRef = useRef(null);
   const scannerId = "web-qr-reader";
-  const [activeTab, setActiveTab] = useState('scan'); // 'scan', 'criancas', 'mural'
+  const [activeTab, setActiveTab] = useState('scan'); // 'scan', 'mural'
   const [scannedAuthorized, setScannedAuthorized] = useState([]);
   const [lastTransaction, setLastTransaction] = useState(null);
   const [registeringPresence, setRegisteringPresence] = useState(false);
@@ -48,74 +48,8 @@ export default function VolunteerDashboard({ user }) {
   const [scannedChildData, setScannedChildData] = useState(null);
   const [scannedParentData, setScannedParentData] = useState(null);
 
-  // Estado para lista de crianças em supervisão (presentes)
-  const [attendanceRecords, setAttendanceRecords] = useState([]);
+  // Estado para modal de ficha da criança
   const [selectedChildModal, setSelectedChildModal] = useState(null);
-  const [searchFilter, setSearchFilter] = useState('');
-
-  // Assinatura em tempo real de presenças do dia
-  useEffect(() => {
-    const unsubscribe = subscribeToDailyAttendance((records) => {
-      setAttendanceRecords(records);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  // Estado para armazenar estatísticas de presenças de cada filho indexado por ID
-  const [childrenStats, setChildrenStats] = useState({});
-
-  useEffect(() => {
-    if (attendanceRecords.length === 0) return;
-    const childIds = [...new Set(attendanceRecords.map(log => log.filho?.id).filter(Boolean))];
-    const fetchStats = async () => {
-      const newStats = { ...childrenStats };
-      let updated = false;
-      for (const id of childIds) {
-        if (!newStats[id]) {
-          try {
-            const stats = await obterEstatisticasFilho(id);
-            newStats[id] = stats;
-            updated = true;
-          } catch (e) {
-            console.error("Erro ao obter estatísticas para o filho:", id, e);
-          }
-        }
-      }
-      if (updated) {
-        setChildrenStats(newStats);
-      }
-    };
-    fetchStats();
-  }, [attendanceRecords]);
-
-  // Calcular lista de crianças que estão atualmente EM SUPERVISÃO (último registro hoje foi 'entrada')
-  const presentChildren = React.useMemo(() => {
-    const mapByChild = new Map();
-    // Como os registros vêm ordenados por data decrescente (mais recentes primeiro):
-    attendanceRecords.forEach(rec => {
-      if (rec.filho?.id && !mapByChild.has(rec.filho.id)) {
-        mapByChild.set(rec.filho.id, rec);
-      }
-    });
-
-    const list = [];
-    mapByChild.forEach(rec => {
-      if (rec.tipo_transacao === 'entrada') {
-        list.push(rec);
-      }
-    });
-    return list;
-  }, [attendanceRecords]);
-
-  // Filtragem de crianças por nome
-  const filteredChildren = presentChildren.filter(item => {
-    if (!searchFilter.trim()) return true;
-    const term = searchFilter.toLowerCase();
-    const childName = item.filho?.nome?.toLowerCase() || '';
-    const childNickname = item.filho?.apelido?.toLowerCase() || '';
-    const parentName = item.responsavel?.nome?.toLowerCase() || '';
-    return childName.includes(term) || childNickname.includes(term) || parentName.includes(term);
-  });
 
   // Buscar pessoas autorizadas e dados ao ler o QR Code
   useEffect(() => {
@@ -352,33 +286,6 @@ export default function VolunteerDashboard({ user }) {
         >
           <QrCode size={16} />
           <span>Leitor QR</span>
-        </button>
-        <button 
-          className={`tab-btn ${activeTab === 'criancas' ? 'active' : ''}`}
-          onClick={() => handleTabChange('criancas')}
-          style={{ position: 'relative' }}
-        >
-          <Users size={16} />
-          <span>Crianças ({presentChildren.length})</span>
-          {presentChildren.length > 0 && (
-            <span style={{
-              position: 'absolute',
-              top: '-4px',
-              right: '-4px',
-              background: '#10b981',
-              color: '#fff',
-              fontSize: '0.65rem',
-              width: '18px',
-              height: '18px',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 700
-            }}>
-              {presentChildren.length}
-            </span>
-          )}
         </button>
         <button 
           className={`tab-btn ${activeTab === 'mural' ? 'active' : ''}`}
@@ -695,261 +602,7 @@ export default function VolunteerDashboard({ user }) {
         </>
       )}
 
-      {/* ABA 2: CRIANÇAS EM SUPERVISÃO (PRESENTES HOJE) */}
-      {activeTab === 'criancas' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {/* Header da Aba com Busca */}
-          <div className="auth-card" style={{ padding: '1rem', gap: '0.75rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <h2 className="heading-font" style={{ fontSize: '1.05rem', margin: 0, color: '#fff', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <Users size={18} style={{ color: 'var(--accent-primary)' }} />
-                  <span>Crianças sob Supervisão</span>
-                </h2>
-                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0, marginTop: '2px' }}>
-                  Crianças com Check-In ativo no departamento hoje ({presentChildren.length})
-                </p>
-              </div>
-            </div>
 
-            {/* Campo de Busca */}
-            <div style={{ position: 'relative', width: '100%' }}>
-              <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-              <input
-                type="text"
-                placeholder="Buscar por criança ou responsável..."
-                value={searchFilter}
-                onChange={(e) => setSearchFilter(e.target.value)}
-                className="form-input"
-                style={{ paddingLeft: '32px', fontSize: '0.85rem' }}
-              />
-            </div>
-          </div>
-
-          {/* Lista de Crianças em Supervisão */}
-          {filteredChildren.length === 0 ? (
-            <div className="auth-card" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-              <Smile size={40} style={{ opacity: 0.3, marginBottom: '0.5rem' }} />
-              <p style={{ margin: 0, fontSize: '0.9rem', color: '#fff', fontWeight: 600 }}>
-                {presentChildren.length === 0 ? 'Nenhuma criança com Check-In no momento' : 'Nenhuma criança encontrada com este nome'}
-              </p>
-              <p style={{ margin: 0, fontSize: '0.75rem', marginTop: '0.25rem' }}>
-                {presentChildren.length === 0 ? 'Assim que os responsáveis apresentarem o QR Code, as crianças aparecerão nesta lista.' : 'Tente buscar com outros termos.'}
-              </p>
-            </div>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '0.85rem' }}>
-              {filteredChildren.map(item => {
-                const child = item.filho || { nome: 'Criança' };
-                const parent = item.responsavel || { nome: 'Responsável' };
-                const vol = item.voluntario || { nome: 'Voluntário' };
-                const checkInDate = new Date(item.data_registro);
-                const stats = childrenStats[child.id];
-
-                // Formatar link do WhatsApp
-                const msgWpp = encodeURIComponent(`Olá, ${parent?.nome || 'Responsável'}! Sou voluntário(a) da Igreja da Criança AD Madureira e estou com o(a) ${child?.nome || 'sua criança'}.`);
-                const wppLink = parent?.telefone ? `https://wa.me/55${parent.telefone.replace(/\D/g, '')}?text=${msgWpp}` : null;
-
-                return (
-                  <div 
-                    key={item.id} 
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.02)',
-                      border: child?.neurodivergente ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid rgba(255, 255, 255, 0.04)',
-                      borderRadius: '8px',
-                      padding: '0.75rem',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '0.5rem',
-                      transition: 'transform 0.15s ease'
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <div style={{ display: 'flex', gap: '0.65rem', alignItems: 'center', flex: 1, minWidth: 0 }}>
-                        {child?.selfie ? (
-                          <img 
-                            src={child.selfie} 
-                            alt={child.nome} 
-                            style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover', border: '1.5px solid var(--accent-primary)', flexShrink: 0 }} 
-                          />
-                        ) : (
-                          <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: 'rgba(255, 255, 255, 0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px dashed rgba(255,255,255,0.1)', flexShrink: 0 }}>
-                            <User size={18} style={{ color: 'var(--text-secondary)' }} />
-                          </div>
-                        )}
-
-                        <div style={{ minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                            <strong style={{ fontSize: '0.9rem', color: '#fff' }}>{child?.nome}</strong>
-                            {child?.apelido && (
-                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.05)', padding: '1px 6px', borderRadius: '4px' }}>
-                                ({child.apelido})
-                              </span>
-                            )}
-                            {child?.neurodivergente && (
-                              <span 
-                                title={child.neurodivergencia_detalhe || 'Neurodivergente'}
-                                style={{ 
-                                  fontSize: '0.7rem', 
-                                  background: 'rgba(245, 158, 11, 0.15)', 
-                                  color: '#f59e0b', 
-                                  padding: '1px 6px', 
-                                  borderRadius: '4px',
-                                  fontWeight: 600
-                                }}
-                              >
-                                {child.neurodivergencia_detalhe || 'Neurodivergente'}
-                              </span>
-                            )}
-                            {child?.alergias && (
-                              <span style={{ 
-                                fontSize: '0.7rem', 
-                                background: 'rgba(239, 68, 68, 0.15)', 
-                                color: '#fca5a5', 
-                                border: '1px solid rgba(239, 68, 68, 0.3)',
-                                padding: '1px 6px', 
-                                borderRadius: '4px',
-                                fontWeight: 600
-                              }}>
-                                ⚠️ Alergia: {child.alergias}
-                              </span>
-                            )}
-                          </div>
-
-                          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginTop: '2px' }}>
-                            Responsável: <strong style={{ color: '#fff' }}>{parent?.nome || 'Não cadastrado'}</strong>
-                          </span>
-
-                          {/* Exibir Frequência e Alerta de Ausência */}
-                          {(() => {
-                            const stats = childrenStats[child?.id];
-                            if (!stats) return null;
-                            return (
-                              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.2rem', flexWrap: 'wrap', fontSize: '0.75rem', color: 'var(--text-secondary)', alignItems: 'center' }}>
-                                <span>Frequência: <strong style={{ color: '#fff' }}>{stats.totalCheckins} cultos</strong></span>
-                                {stats.ultimoCheckin && (
-                                  <span>• Último: <strong style={{ color: '#fff' }}>{new Date(stats.ultimoCheckin).toLocaleDateString('pt-BR')} ({stats.diasAusente} dias)</strong></span>
-                                )}
-                                {stats.diasAusente && stats.diasAusente > 30 && (
-                                  <span style={{ 
-                                    background: 'rgba(245, 158, 11, 0.15)', 
-                                    color: '#fbbf24', 
-                                    padding: '1px 6px', 
-                                    borderRadius: '4px',
-                                    fontSize: '0.7rem',
-                                    fontWeight: 600
-                                  }}>
-                                    ⚠️ Ausente há mais de 1 mês!
-                                  </span>
-                                )}
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      </div>
-
-                      {/* Status Badge */}
-                      <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.2rem', flexShrink: 0 }}>
-                        <span style={{
-                          fontSize: '0.7rem',
-                          fontWeight: 600,
-                          padding: '2px 8px',
-                          borderRadius: '10px',
-                          background: 'rgba(16, 185, 129, 0.15)',
-                          color: '#10b981'
-                        }}>
-                          Entrada
-                        </span>
-                        <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-                          {checkInDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Destaque Como Acalmar se existir */}
-                    {child?.como_acalmar && (
-                      <div style={{
-                        background: 'rgba(99, 102, 241, 0.12)',
-                        border: '1px solid rgba(99, 102, 241, 0.25)',
-                        color: '#c7d2fe',
-                        padding: '0.4rem 0.6rem',
-                        borderRadius: '6px',
-                        fontSize: '0.75rem',
-                        lineHeight: '1.35'
-                      }}>
-                        <strong>💡 Como acalmar:</strong> "{child.como_acalmar}"
-                      </div>
-                    )}
-
-                    {/* Rodapé do Card com Ações (Registrado Por + WhatsApp + Ver Ficha) */}
-                    <div style={{ 
-                      display: 'flex', 
-                      justifyContent: 'space-between', 
-                      alignItems: 'center', 
-                      borderTop: '1px solid rgba(255,255,255,0.03)', 
-                      paddingTop: '0.4rem',
-                      fontSize: '0.75rem',
-                      color: 'var(--text-secondary)',
-                      flexWrap: 'wrap',
-                      gap: '0.4rem'
-                    }}>
-                      <span>
-                        Registrado por: <strong style={{ color: 'var(--text-primary)' }}>{vol?.nome || 'Voluntário'}</strong>
-                      </span>
-
-                      <div style={{ display: 'flex', gap: '0.4rem' }}>
-                        {(child?.neurodivergente || child?.como_acalmar) && child?.como_acalmar && (
-                          <button 
-                            onClick={() => alert(`Como acalmar ${child.nome}:\n\n${child.como_acalmar}`)}
-                            style={{ 
-                              background: 'rgba(245, 158, 11, 0.1)', 
-                              border: '1px solid rgba(245, 158, 11, 0.2)',
-                              color: '#f59e0b',
-                              fontSize: '0.7rem',
-                              padding: '3px 8px',
-                              borderRadius: '4px',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            Como Acalmar
-                          </button>
-                        )}
-                        {wppLink && (
-                          <a 
-                            href={wppLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{ 
-                              background: 'rgba(16, 185, 129, 0.1)', 
-                              border: '1px solid rgba(16, 185, 129, 0.2)',
-                              color: '#10b981',
-                              fontSize: '0.7rem',
-                              padding: '3px 8px',
-                              borderRadius: '4px',
-                              textDecoration: 'none',
-                              fontWeight: 500
-                            }}
-                          >
-                            Chamar no WhatsApp
-                          </a>
-                        )}
-                        <button 
-                          onClick={() => setSelectedChildModal({ child, parent })}
-                          className="btn btn-secondary"
-                          style={{ padding: '3px 8px', fontSize: '0.7rem', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}
-                        >
-                          <FileText size={12} />
-                          <span>Ver Ficha</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* ABA 3: MURAL DE MÍDIA */}
       {activeTab === 'mural' && (
