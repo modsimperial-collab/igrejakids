@@ -332,57 +332,64 @@ export const subscribeToDailyAttendance = (callback) => {
       return;
     }
 
-    // Coletar todos os IDs de filhos e usuários únicos envolvidos
-    const filhoIds = [...new Set(rawData.map(r => r.filho_id).filter(Boolean))];
-    const userIds = [...new Set([
-      ...rawData.map(r => r.responsavel_id).filter(Boolean),
-      ...rawData.map(r => r.voluntario_id).filter(Boolean)
-    ])];
+    // Buscar TODOS os filhos e usuários para mapeamento 100% completo e sem falhas de tipo/RLS
+    let { data: allFilhos } = await supabase.from('filhos').select('*');
+    let { data: allUsuarios } = await supabase.from('usuarios').select('*');
 
-    let filhosMap = {};
-    let usersMap = {};
+    const filhosMap = {};
+    const filhosByParentMap = {};
+    if (allFilhos) {
+      allFilhos.forEach(f => {
+        if (!f.id) return;
+        const idStr = String(f.id).trim().toLowerCase();
+        filhosMap[idStr] = f;
+        filhosMap[f.id] = f;
 
-    // Buscar dados completos das crianças (com fallback de busca geral para evitar inconsistência de tipos ou RLS)
-    if (filhoIds.length > 0) {
-      const { data: fData } = await supabase.from('filhos').select('*').in('id', filhoIds);
-      if (fData && fData.length > 0) {
-        fData.forEach(f => {
-          filhosMap[f.id] = f;
-          filhosMap[String(f.id)] = f;
-        });
-      }
-      
-      // Fallback: se algum ID não foi encontrado no map, buscar todos os filhos
-      const missingIds = filhoIds.filter(id => !filhosMap[id] && !filhosMap[String(id)]);
-      if (missingIds.length > 0) {
-        const { data: allF } = await supabase.from('filhos').select('*');
-        if (allF) {
-          allF.forEach(f => {
-            filhosMap[f.id] = f;
-            filhosMap[String(f.id)] = f;
-          });
+        if (f.responsavel_id) {
+          const pId = String(f.responsavel_id).trim();
+          if (!filhosByParentMap[pId]) filhosByParentMap[pId] = [];
+          filhosByParentMap[pId].push(f);
         }
-      }
+      });
     }
 
-    // Buscar dados completos dos responsáveis e voluntários
-    const { data: uData } = await supabase.from('usuarios').select('*');
-    if (uData && uData.length > 0) {
-      uData.forEach(u => {
+    const usersMap = {};
+    if (allUsuarios) {
+      allUsuarios.forEach(u => {
+        if (!u.uid) return;
+        const uidStr = String(u.uid).trim();
+        usersMap[uidStr] = u;
         usersMap[u.uid] = u;
-        usersMap[String(u.uid)] = u;
       });
     }
 
     const formatted = rawData.map(rec => {
-      const fObj = filhosMap[rec.filho_id] || filhosMap[String(rec.filho_id)];
+      // Tratar caso rec.filho_id venha em formato JSON ou com aspas extras
+      let cleanFilhoId = rec.filho_id;
+      if (typeof rec.filho_id === 'string' && rec.filho_id.startsWith('{')) {
+        try {
+          const parsed = JSON.parse(rec.filho_id);
+          cleanFilhoId = parsed.childId || parsed.id || rec.filho_id;
+        } catch (e) {}
+      }
+
+      const fidStr = cleanFilhoId ? String(cleanFilhoId).trim().toLowerCase() : '';
+      let fObj = filhosMap[fidStr] || filhosMap[cleanFilhoId] || filhosMap[rec.filho_id];
+
       const rId = rec.responsavel_id || fObj?.responsavel_id;
-      const rObj = usersMap[rId] || usersMap[String(rId)];
-      const vObj = usersMap[rec.voluntario_id] || usersMap[String(rec.voluntario_id)];
+      const rIdStr = rId ? String(rId).trim() : '';
+
+      // Fallback: Se a criança não foi encontrada diretamente pelo filho_id, mas temos o responsável, associar o filho do responsável
+      if (!fObj && rIdStr && filhosByParentMap[rIdStr] && filhosByParentMap[rIdStr].length > 0) {
+        fObj = filhosByParentMap[rIdStr][0];
+      }
+
+      const rObj = usersMap[rIdStr] || usersMap[rId];
+      const vObj = rec.voluntario_id ? (usersMap[String(rec.voluntario_id).trim()] || usersMap[rec.voluntario_id]) : null;
 
       return {
         ...rec,
-        filho: fObj || { id: rec.filho_id, nome: 'Criança' },
+        filho: fObj || { id: cleanFilhoId || rec.filho_id, nome: 'Criança' },
         responsavel: rObj || { uid: rId, nome: 'Responsável' },
         voluntario: vObj || { uid: rec.voluntario_id, nome: 'Voluntário' }
       };
