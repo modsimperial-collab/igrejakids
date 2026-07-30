@@ -9,6 +9,9 @@ import {
   obterEstatisticasFilho,
   getTodasEscalas,
   criarEscala,
+  deletarEscala,
+  substituirVoluntarioEscala,
+  recusarSolicitacaoTroca,
   supabase
 } from '../services/supabase';
 import { 
@@ -38,7 +41,9 @@ import {
   Layers,
   Award,
   CheckCircle2,
-  Zap
+  Zap,
+  RefreshCw,
+  X
 } from 'lucide-react';
 import SocialWall from '../components/SocialWall';
 import SelfieCapture from '../components/SelfieCapture';
@@ -75,6 +80,44 @@ export default function AdminDashboard({ user }) {
   const [escalaTurno, setEscalaTurno] = useState('Manhã');
   const [escalaFuncao, setEscalaFuncao] = useState('Recepção / Cuidado');
   const [savingEscala, setSavingEscala] = useState(false);
+  const [replacingEscalaId, setReplacingEscalaId] = useState(null);
+  const [replacementVolunteerId, setReplacementVolunteerId] = useState('');
+
+  const handleDeletarEscala = async (escalaId) => {
+    if (!window.confirm("Deseja remover este voluntário da escala?")) return;
+    try {
+      await deletarEscala(escalaId);
+      fetchEscalas();
+    } catch (err) {
+      alert("Erro ao remover da escala: " + err.message);
+    }
+  };
+
+  const handleSubstituirVoluntario = async (escalaId) => {
+    if (!replacementVolunteerId) {
+      alert("Selecione o novo voluntário para substituir nesta escala.");
+      return;
+    }
+    try {
+      await substituirVoluntarioEscala(escalaId, replacementVolunteerId);
+      alert("Voluntário substituído na escala com sucesso!");
+      setReplacingEscalaId(null);
+      setReplacementVolunteerId('');
+      fetchEscalas();
+    } catch (err) {
+      alert("Erro ao substituir voluntário: " + err.message);
+    }
+  };
+
+  const handleRecusarTroca = async (escalaId) => {
+    if (!window.confirm("Deseja manter o voluntário atual e remover o aviso de solicitação de troca?")) return;
+    try {
+      await recusarSolicitacaoTroca(escalaId);
+      fetchEscalas();
+    } catch (err) {
+      alert("Erro ao atualizar solicitação: " + err.message);
+    }
+  };
 
   useEffect(() => {
     fetchEscalas();
@@ -533,33 +576,120 @@ export default function AdminDashboard({ user }) {
                     key={item.id} 
                     style={{ 
                       display: 'flex', 
-                      justifyContent: 'space-between', 
-                      alignItems: 'center', 
-                      background: 'rgba(255, 255, 255, 0.02)', 
-                      border: '1px solid var(--border-color)', 
+                      flexDirection: 'column',
+                      gap: '0.75rem',
+                      background: item.solicitou_troca ? 'rgba(245, 158, 11, 0.08)' : 'rgba(255, 255, 255, 0.02)', 
+                      border: item.solicitou_troca ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid var(--border-color)', 
                       borderRadius: '10px', 
                       padding: '0.85rem 1rem' 
                     }}
                   >
-                    <div>
-                      <strong style={{ color: '#fff', fontSize: '0.95rem', display: 'block' }}>
-                        {item.voluntario?.nome || 'Voluntário'}
-                      </strong>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                        Data: <strong>{new Date(item.data_culto + 'T00:00:00').toLocaleDateString('pt-BR')}</strong> ({item.turno}) • Função: <strong>{item.funcao}</strong>
-                      </span>
-                    </div>
-
-                    {item.solicitou_troca && (
-                      <div style={{ textAlign: 'right' }}>
-                        <span style={{ fontSize: '0.75rem', background: 'rgba(245, 158, 11, 0.2)', color: '#fbbf24', padding: '0.25rem 0.6rem', borderRadius: '6px', fontWeight: 600, display: 'inline-block' }}>
-                          ⚠️ Pediu Troca de Turno
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <strong style={{ color: '#fff', fontSize: '0.95rem' }}>
+                            {item.voluntario?.nome || 'Voluntário'}
+                          </strong>
+                          {item.solicitou_troca && (
+                            <span style={{ fontSize: '0.7rem', background: 'rgba(245, 158, 11, 0.2)', color: '#fbbf24', padding: '0.15rem 0.5rem', borderRadius: '6px', fontWeight: 600 }}>
+                              ⚠️ Pediu Troca
+                            </span>
+                          )}
+                        </div>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginTop: '0.2rem' }}>
+                          Data: <strong>{new Date(item.data_culto + 'T00:00:00').toLocaleDateString('pt-BR')}</strong> ({item.turno}) • Função: <strong>{item.funcao}</strong>
                         </span>
-                        {item.observacao_troca && (
-                          <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block', marginTop: '0.2rem' }}>
-                            Motivo: {item.observacao_troca}
+                        {item.solicitou_troca && item.observacao_troca && (
+                          <span style={{ fontSize: '0.75rem', color: '#fbbf24', fontStyle: 'italic', display: 'block', marginTop: '0.25rem' }}>
+                            Motivo da troca: "{item.observacao_troca}"
                           </span>
                         )}
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                        {replacingEscalaId !== item.id && (
+                          <>
+                            <button
+                              onClick={() => {
+                                setReplacingEscalaId(item.id);
+                                setReplacementVolunteerId('');
+                              }}
+                              className="btn"
+                              title="Trocar por outro voluntário"
+                              style={{ padding: '0.35rem 0.65rem', fontSize: '0.75rem', background: 'rgba(14, 165, 233, 0.15)', color: 'var(--accent-primary)', border: '1px solid rgba(14, 165, 233, 0.3)' }}
+                            >
+                              <RefreshCw size={13} style={{ marginRight: '0.3rem' }} />
+                              Trocar Voluntário
+                            </button>
+
+                            {item.solicitou_troca && (
+                              <button
+                                onClick={() => handleRecusarTroca(item.id)}
+                                className="btn"
+                                title="Ignorar pedido e manter voluntário"
+                                style={{ padding: '0.35rem 0.65rem', fontSize: '0.75rem', background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-secondary)' }}
+                              >
+                                <X size={13} style={{ marginRight: '0.3rem' }} />
+                                Manter
+                              </button>
+                            )}
+
+                            <button
+                              onClick={() => handleDeletarEscala(item.id)}
+                              className="btn"
+                              title="Remover voluntário desta escala"
+                              style={{ padding: '0.35rem 0.65rem', fontSize: '0.75rem', background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)' }}
+                            >
+                              <Trash2 size={13} style={{ marginRight: '0.3rem' }} />
+                              Tirar da Escala
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Form de substituição inline */}
+                    {replacingEscalaId === item.id && (
+                      <div style={{ background: 'rgba(0, 0, 0, 0.25)', padding: '0.75rem', borderRadius: '8px', border: '1px dashed var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        <label style={{ fontSize: '0.75rem', color: '#fff', fontWeight: 600 }}>
+                          Selecione o novo voluntário para assumir esta escala:
+                        </label>
+                        <select
+                          className="form-input"
+                          value={replacementVolunteerId}
+                          onChange={(e) => setReplacementVolunteerId(e.target.value)}
+                          style={{ fontSize: '0.8rem', padding: '0.4rem' }}
+                        >
+                          <option value="">-- Selecione um Voluntário --</option>
+                          {activeVolunteers
+                            .filter(v => v.uid !== item.voluntario?.uid)
+                            .map(vol => (
+                              <option key={vol.uid} value={vol.uid}>
+                                {vol.nome} ({vol.ministerio || 'Voluntário'})
+                              </option>
+                            ))}
+                        </select>
+                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                          <button
+                            type="button"
+                            className="btn"
+                            onClick={() => {
+                              setReplacingEscalaId(null);
+                              setReplacementVolunteerId('');
+                            }}
+                            style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            onClick={() => handleSubstituirVoluntario(item.id)}
+                            style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}
+                          >
+                            Confirmar Substituição
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>

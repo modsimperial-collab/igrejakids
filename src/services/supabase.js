@@ -342,24 +342,47 @@ export const subscribeToDailyAttendance = (callback) => {
     let filhosMap = {};
     let usersMap = {};
 
-    // Buscar dados completos das crianças (nome, selfie, alergias, neurodivergências, etc.)
+    // Buscar dados completos das crianças (com fallback de busca geral para evitar inconsistência de tipos ou RLS)
     if (filhoIds.length > 0) {
       const { data: fData } = await supabase.from('filhos').select('*').in('id', filhoIds);
-      if (fData) fData.forEach(f => { filhosMap[f.id] = f; });
+      if (fData && fData.length > 0) {
+        fData.forEach(f => {
+          filhosMap[f.id] = f;
+          filhosMap[String(f.id)] = f;
+        });
+      } else {
+        const { data: allF } = await supabase.from('filhos').select('*');
+        if (allF) {
+          allF.forEach(f => {
+            filhosMap[f.id] = f;
+            filhosMap[String(f.id)] = f;
+          });
+        }
+      }
     }
 
-    // Buscar dados completos dos responsáveis e voluntários (nome, telefone)
-    if (userIds.length > 0) {
-      const { data: uData } = await supabase.from('usuarios').select('uid, nome, telefone').in('uid', userIds);
-      if (uData) uData.forEach(u => { usersMap[u.uid] = u; });
+    // Buscar dados completos dos responsáveis e voluntários
+    const { data: uData } = await supabase.from('usuarios').select('uid, nome, telefone');
+    if (uData && uData.length > 0) {
+      uData.forEach(u => {
+        usersMap[u.uid] = u;
+        usersMap[String(u.uid)] = u;
+      });
     }
 
-    const formatted = rawData.map(rec => ({
-      ...rec,
-      filho: filhosMap[rec.filho_id] || { id: rec.filho_id, nome: 'Criança' },
-      responsavel: usersMap[rec.responsavel_id] || { uid: rec.responsavel_id, nome: 'Responsável' },
-      voluntario: usersMap[rec.voluntario_id] || { uid: rec.voluntario_id, nome: 'Voluntário' }
-    }));
+    const formatted = rawData.map(rec => {
+      const fObj = filhosMap[rec.filho_id] || filhosMap[String(rec.filho_id)];
+      const rId = rec.responsavel_id || fObj?.responsavel_id;
+      const rObj = usersMap[rId] || usersMap[String(rId)];
+      const vObj = usersMap[rec.voluntario_id] || usersMap[String(rec.voluntario_id)];
+
+      return {
+        ...rec,
+        filho: fObj || { id: rec.filho_id, nome: 'Criança' },
+        responsavel: rObj || { uid: rId, nome: 'Responsável' },
+        voluntario: vObj || { uid: rec.voluntario_id, nome: 'Voluntário' }
+      };
+    });
 
     callback(formatted);
   };
@@ -483,11 +506,27 @@ export const getDiarioBordoByFilho = async (filhoId) => {
  * 2. Chamadas de Emergência em Tempo Real
  */
 export const solicitarChamadaEmergencia = async (filhoId, responsavelId, voluntarioId, motivo) => {
+  let targetResponsavelId = responsavelId;
+
+  // Se o responsavelId veio nulo ou indefinido, busca diretamente da criança na tabela 'filhos'
+  if (!targetResponsavelId && filhoId) {
+    const { data: childData } = await supabase
+      .from('filhos')
+      .select('responsavel_id')
+      .eq('id', filhoId)
+      .maybeSingle();
+    targetResponsavelId = childData?.responsavel_id;
+  }
+
+  if (!targetResponsavelId) {
+    throw new Error('Não foi possível identificar o responsável desta criança para emitir a chamada.');
+  }
+
   const { data, error } = await supabase
     .from('chamadas_emergencia')
     .insert([{
       filho_id: filhoId,
-      responsavel_id: responsavelId,
+      responsavel_id: targetResponsavelId,
       voluntario_id: voluntarioId,
       motivo,
       status: 'ativa',
@@ -600,6 +639,60 @@ export const criarEscala = async ({ voluntarioId, dataCulto, turno, funcao }) =>
       turno: turno || 'Manhã',
       funcao: funcao || 'Recepção / Cuidado'
     }])
+    .select();
+
+  if (error) throw new Error(error.message);
+  return data[0];
+};
+
+export const deletarEscala = async (escalaId) => {
+  const { error } = await supabase
+    .from('escala_voluntarios')
+    .delete()
+    .eq('id', escalaId);
+
+  if (error) throw new Error(error.message);
+  return true;
+};
+
+export const substituirVoluntarioEscala = async (escalaId, novoVoluntarioId) => {
+  const { data, error } = await supabase
+    .from('escala_voluntarios')
+    .update({ 
+      voluntario_id: novoVoluntarioId,
+      solicitou_troca: false,
+      observacao_troca: null
+    })
+    .eq('id', escalaId)
+    .select();
+
+  if (error) throw new Error(error.message);
+  return data[0];
+};
+
+export const recusarSolicitacaoTroca = async (escalaId) => {
+  const { data, error } = await supabase
+    .from('escala_voluntarios')
+    .update({ 
+      solicitou_troca: false,
+      observacao_troca: null
+    })
+    .eq('id', escalaId)
+    .select();
+
+  if (error) throw new Error(error.message);
+  return data[0];
+};
+
+export const assumirTrocaEscala = async (escalaId, voluntarioId) => {
+  const { data, error } = await supabase
+    .from('escala_voluntarios')
+    .update({ 
+      voluntario_id: voluntarioId,
+      solicitou_troca: false,
+      observacao_troca: null
+    })
+    .eq('id', escalaId)
     .select();
 
   if (error) throw new Error(error.message);

@@ -581,6 +581,7 @@ export default function ChildDetailsModal({ child, parent, voluntarioId, onClose
         {showEmergencyModal && (
           <EmergencyCallModal
             child={child}
+            parent={parent}
             voluntarioId={voluntarioId}
             onClose={() => setShowEmergencyModal(false)}
             onSuccess={() => {

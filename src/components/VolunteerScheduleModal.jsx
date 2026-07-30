@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, Clock, RefreshCw, AlertCircle, CheckCircle, User } from 'lucide-react';
-import { getTodasEscalas, solicitarTrocaEscala } from '../services/supabase';
+import { X, Calendar, Clock, RefreshCw, AlertCircle, CheckCircle, User, Check } from 'lucide-react';
+import { getTodasEscalas, solicitarTrocaEscala, assumirTrocaEscala } from '../services/supabase';
 
 export default function VolunteerScheduleModal({ voluntario, onClose }) {
   const [escalas, setEscalas] = useState([]);
@@ -39,6 +39,20 @@ export default function VolunteerScheduleModal({ voluntario, onClose }) {
       fetchEscalas();
     } catch (err) {
       alert('Erro ao solicitar troca: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAssumirTroca = async (escalaId) => {
+    if (!window.confirm("Deseja assumir esta escala no lugar do colega?")) return;
+    setSaving(true);
+    try {
+      await assumirTrocaEscala(escalaId, voluntario.uid);
+      setMessage('Você assumiu esta escala com sucesso! Obrigado pelo apoio.');
+      fetchEscalas();
+    } catch (err) {
+      alert('Erro ao assumir troca: ' + err.message);
     } finally {
       setSaving(false);
     }
@@ -177,18 +191,33 @@ export default function VolunteerScheduleModal({ voluntario, onClose }) {
           {outrasEscalas.length === 0 ? (
             <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>Nenhum outro voluntário escalado ainda.</p>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '180px', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '220px', overflowY: 'auto' }}>
               {outrasEscalas.map(e => (
-                <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.15)', padding: '0.5rem 0.75rem', borderRadius: '8px', fontSize: '0.8rem' }}>
+                <div key={e.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.15)', padding: '0.6rem 0.75rem', borderRadius: '8px', fontSize: '0.8rem' }}>
                   <div>
                     <strong style={{ color: '#fff' }}>{e.voluntario?.nome || 'Voluntário'}</strong>
                     <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block' }}>
                       {e.data_culto} ({e.turno}) - {e.funcao}
                     </span>
+                    {e.observacao_troca && (
+                      <span style={{ fontSize: '0.7rem', color: '#fbbf24', fontStyle: 'italic', display: 'block', marginTop: '0.1rem' }}>
+                        Motivo: {e.observacao_troca}
+                      </span>
+                    )}
                   </div>
-                  {e.solicitou_troca && (
-                    <span style={{ fontSize: '0.65rem', background: 'rgba(239, 68, 68, 0.15)', color: '#fca5a5', padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
-                      Disponível p/ troca
+                  {e.solicitou_troca ? (
+                    <button
+                      onClick={() => handleAssumirTroca(e.id)}
+                      disabled={saving}
+                      className="btn btn-primary"
+                      style={{ padding: '0.3rem 0.6rem', fontSize: '0.7rem', background: '#10b981', borderColor: '#10b981', color: '#fff', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                    >
+                      <Check size={12} />
+                      <span>Assumir Turno</span>
+                    </button>
+                  ) : (
+                    <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', padding: '0.15rem 0.4rem', borderRadius: '4px', background: 'rgba(255,255,255,0.05)' }}>
+                      Confirmado
                     </span>
                   )}
                 </div>

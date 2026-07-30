@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { X, AlertTriangle, Bell, PhoneCall } from 'lucide-react';
 import { solicitarChamadaEmergencia } from '../services/supabase';
 
-export default function EmergencyCallModal({ child, voluntarioId, onClose, onSuccess }) {
+export default function EmergencyCallModal({ child, parent, voluntarioId, onClose, onSuccess }) {
   const [motivo, setMotivo] = useState('Choro persistente e necessidade de acolhimento dos pais');
   const [motivoPersonalizado, setMotivoPersonalizado] = useState('');
   const [loading, setLoading] = useState(false);
@@ -29,18 +29,22 @@ export default function EmergencyCallModal({ child, voluntarioId, onClose, onSuc
     setError('');
 
     try {
+      const childId = child?.id || child?.filho?.id;
+      const respId = child?.responsavel_id || child?.responsavel?.uid || parent?.uid || parent?.id || child?.filho?.responsavel_id;
+
       await solicitarChamadaEmergencia(
-        child.id || child.filho?.id,
-        child.responsavel_id || child.responsavel?.uid,
+        childId,
+        respId,
         voluntarioId,
         motivoFinal
       );
 
       // Também abre o WhatsApp com a mensagem de aviso urgente
-      const telefone = child.responsavel?.telefone;
+      const telefone = child?.responsavel?.telefone || parent?.telefone;
+      const childName = child?.nome || child?.filho?.nome || 'sua criança';
       if (telefone) {
         const cleanPhone = telefone.replace(/\D/g, '');
-        const mensagem = `🚨 *IGREJA KIDS - AVISO URGENTE*\nOlá! Solicitamos a sua presença na salinha do Igreja Kids para acompanhar o(a) filho(a) *${child.nome || child.filho?.nome}*.\n\n*Motivo:* ${motivoFinal}`;
+        const mensagem = `🚨 *IGREJA KIDS - AVISO URGENTE*\nOlá! Solicitamos a sua presença na salinha do Igreja Kids para acompanhar o(a) filho(a) *${childName}*.\n\n*Motivo:* ${motivoFinal}`;
         window.open(`https://wa.me/55${cleanPhone}?text=${encodeURIComponent(mensagem)}`, '_blank');
       }
 
