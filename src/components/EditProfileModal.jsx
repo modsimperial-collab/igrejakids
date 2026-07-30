@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { supabase } from '../services/supabase';
 import { X, User, Phone, MapPin, Camera, Save, Heart, Shield } from 'lucide-react';
 import SelfieCapture from './SelfieCapture';
+import DocumentUpload from './DocumentUpload';
 
 export default function EditProfileModal({ user, onClose }) {
   const [nome, setNome] = useState(user?.nome || '');
@@ -15,6 +16,7 @@ export default function EditProfileModal({ user, onClose }) {
 
   // Voluntario fields
   const [ministerio, setMinisterio] = useState(user?.ministerio || '');
+  const [antecedentes, setAntecedentes] = useState(user?.antecedentes_criminais || null);
 
   const [saving, setSaving] = useState(false);
 
@@ -37,6 +39,10 @@ export default function EditProfileModal({ user, onClose }) {
     } else if (user.tipo_usuario === 'voluntario') {
       if (!ministerio.trim()) {
         alert('Por favor, informe seu ministério ou igreja de origem.');
+        return;
+      }
+      if (!antecedentes) {
+        alert('É obrigatório anexar a Certidão de Antecedentes Criminais.');
         return;
       }
     }
@@ -65,6 +71,7 @@ export default function EditProfileModal({ user, onClose }) {
         updateData.nome_igreja = membroIgreja ? nomeIgreja : '';
       } else if (user.tipo_usuario === 'voluntario') {
         updateData.ministerio = ministerio;
+        updateData.antecedentes_criminais = antecedentes;
       }
 
       const { error } = await supabase
@@ -206,18 +213,28 @@ export default function EditProfileModal({ user, onClose }) {
 
           {/* Ministério para Voluntário */}
           {user.tipo_usuario === 'voluntario' && (
-            <div className="form-group">
-              <label className="form-label">Ministério ou Igreja de Origem</label>
-              <input
-                type="text"
-                className="form-input"
-                value={ministerio}
-                onChange={(e) => setMinisterio(e.target.value)}
-                placeholder="Ex: Ministério Infantil Sede, Igreja Parceira X..."
-                required
+            <>
+              <div className="form-group">
+                <label className="form-label">Ministério ou Igreja de Origem</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={ministerio}
+                  onChange={(e) => setMinisterio(e.target.value)}
+                  placeholder="Ex: Ministério Infantil Sede, Igreja Parceira X..."
+                  required
+                  disabled={saving}
+                />
+              </div>
+
+              <DocumentUpload
+                label="Certidão de Antecedentes Criminais"
+                onUpload={setAntecedentes}
+                initialValue={antecedentes}
+                required={true}
                 disabled={saving}
               />
-            </div>
+            </>
           )}
 
           {/* Selfie Capture */}

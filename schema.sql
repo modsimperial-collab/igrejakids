@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS public.usuarios (
   selfie TEXT, -- NOVO: Foto do responsável em formato Base64
   ministerio TEXT, -- NOVO: Ministério do voluntário
   nome_igreja TEXT, -- NOVO: Nome da congregação/igreja do membro
+  antecedentes_criminais TEXT, -- NOVO: Certidão de Antecedentes Criminais (PDF ou Foto em Base64)
   data_cadastro TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -28,8 +29,10 @@ CREATE TABLE IF NOT EXISTS public.filhos (
   neurodivergente BOOLEAN NOT NULL DEFAULT false, -- NOVO: Possui neurodivergência
   neurodivergencia_detalhe TEXT, -- NOVO: Qual neurodivergência
   como_acalmar TEXT, -- NOVO: Como acalmar em crise
+  alergias TEXT, -- NOVO: Alergias e restrições alimentares
   termo_aceito BOOLEAN NOT NULL DEFAULT false, -- NOVO: Aceitou o termo de imagem e voz
   selfie TEXT, -- NOVO: Foto (selfie) da criança em Base64
+  visitante BOOLEAN NOT NULL DEFAULT false, -- NOVO: Criança cadastrada via Check-in Express
   data_cadastro TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -109,13 +112,76 @@ ALTER TABLE public.registro_presencas ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Permitir acesso completo a presencas para autenticados" 
   ON public.registro_presencas FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
--- 7. HABILITAR REPLICAÇÃO EM TEMPO REAL (REALTIME)
-ALTER PUBLICATION supabase_realtime ADD TABLE public.usuarios;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.filhos;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.posts;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.comentarios;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.autorizados_retirada;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.registro_presencas;
+-- 6.8. TABELA DE DIÁRIO DE BORDO (FEEDBACK DO CULTO)
+CREATE TABLE IF NOT EXISTS public.diario_bordo (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  filho_id UUID REFERENCES public.filhos(id) ON DELETE CASCADE NOT NULL,
+  voluntario_id TEXT REFERENCES public.usuarios(uid) ON DELETE CASCADE NOT NULL,
+  tags TEXT[], -- Ex: ['Lanchou bem', 'Participou das brincadeiras']
+  observacoes TEXT,
+  data_registro TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+ALTER TABLE public.diario_bordo ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Permitir acesso completo ao diario de bordo para autenticados" ON public.diario_bordo FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- 6.9. TABELA DE ESCALA DE VOLUNTÁRIOS
+CREATE TABLE IF NOT EXISTS public.escala_voluntarios (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  voluntario_id TEXT REFERENCES public.usuarios(uid) ON DELETE CASCADE NOT NULL,
+  data_culto DATE NOT NULL,
+  turno TEXT NOT NULL DEFAULT 'Manhã',
+  funcao TEXT DEFAULT 'Recepção / Cuidado',
+  solicitou_troca BOOLEAN DEFAULT false,
+  observacao_troca TEXT,
+  data_cadastro TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+ALTER TABLE public.escala_voluntarios ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Permitir acesso completo a escalas para autenticados" ON public.escala_voluntarios FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- 6.10. TABELA DE CHAMADAS DE EMERGÊNCIA (PAIS NO CULTO)
+CREATE TABLE IF NOT EXISTS public.chamadas_emergencia (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  filho_id UUID REFERENCES public.filhos(id) ON DELETE CASCADE NOT NULL,
+  responsavel_id TEXT REFERENCES public.usuarios(uid) ON DELETE CASCADE NOT NULL,
+  voluntario_id TEXT REFERENCES public.usuarios(uid) ON DELETE CASCADE NOT NULL,
+  motivo TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'ativa' CHECK (status IN ('ativa', 'atendida', 'cancelada')),
+  data_chamada TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+ALTER TABLE public.chamadas_emergencia ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Permitir acesso completo a chamadas para autenticados" ON public.chamadas_emergencia FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+-- 7. HABILITAR REPLICAÇÃO EM TEMPO REAL (REALTIME) SEGURO
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'usuarios') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.usuarios;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'filhos') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.filhos;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'posts') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.posts;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'comentarios') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.comentarios;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'autorizados_retirada') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.autorizados_retirada;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'registro_presencas') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.registro_presencas;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'diario_bordo') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.diario_bordo;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'escala_voluntarios') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.escala_voluntarios;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'chamadas_emergencia') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.chamadas_emergencia;
+  END IF;
+END $$;
 
 -- 8. TRIGGER PARA CRIAÇÃO AUTOMÁTICA DE PERFIL (E FILHOS) COM PRIVILÉGIOS DE SISTEMA
 CREATE OR REPLACE FUNCTION public.handle_new_user()
@@ -133,7 +199,8 @@ BEGIN
     membro_igreja,
     selfie,
     ministerio,
-    nome_igreja
+    nome_igreja,
+    antecedentes_criminais
   )
   VALUES (
     NEW.id,
@@ -146,7 +213,8 @@ BEGIN
     COALESCE((NEW.raw_user_meta_data->>'membro_igreja')::boolean, false),
     NEW.raw_user_meta_data->>'selfie',
     NEW.raw_user_meta_data->>'ministerio',
-    NEW.raw_user_meta_data->>'nome_igreja'
+    NEW.raw_user_meta_data->>'nome_igreja',
+    NEW.raw_user_meta_data->>'antecedentes_criminais'
   )
   ON CONFLICT (uid) DO UPDATE SET
     nome = EXCLUDED.nome,
@@ -155,7 +223,8 @@ BEGIN
     membro_igreja = EXCLUDED.membro_igreja,
     selfie = EXCLUDED.selfie,
     ministerio = EXCLUDED.ministerio,
-    nome_igreja = EXCLUDED.nome_igreja;
+    nome_igreja = EXCLUDED.nome_igreja,
+    antecedentes_criminais = EXCLUDED.antecedentes_criminais;
 
   -- Se for responsável e tiver dados do filho no metadata, insere automaticamente na tabela de filhos
   IF COALESCE(NEW.raw_user_meta_data->>'tipo_usuario', 'voluntario') = 'responsavel' AND NEW.raw_user_meta_data->>'child_name' IS NOT NULL AND NEW.raw_user_meta_data->>'child_name' <> '' THEN
@@ -167,6 +236,7 @@ BEGIN
       neurodivergente,
       neurodivergencia_detalhe,
       como_acalmar,
+      alergias,
       termo_aceito,
       selfie
     ) VALUES (
@@ -177,6 +247,7 @@ BEGIN
       COALESCE((NEW.raw_user_meta_data->>'child_neurodivergente')::boolean, false),
       NEW.raw_user_meta_data->>'child_neurodivergencia_detalhe',
       NEW.raw_user_meta_data->>'child_como_acalmar',
+      NEW.raw_user_meta_data->>'child_alergias',
       COALESCE((NEW.raw_user_meta_data->>'child_termo_aceito')::boolean, false),
       NEW.raw_user_meta_data->>'child_selfie'
     );
@@ -189,3 +260,8 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE OR REPLACE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
+
+-- SCRIPT DE ATUALIZAÇÃO PARA BANCOS JÁ EXISTENTES:
+-- ALTER TABLE public.usuarios ADD COLUMN IF NOT EXISTS antecedentes_criminais TEXT;
+-- ALTER TABLE public.filhos ADD COLUMN IF NOT EXISTS alergias TEXT;
+

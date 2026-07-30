@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { subscribeToChildren, addChild, supabase } from '../services/supabase';
+import { 
+  subscribeToChildren, 
+  addChild, 
+  supabase, 
+  subscribeToChamadasEmergenciaResponsavel, 
+  atenderChamadaEmergencia, 
+  getDiarioBordoByFilho 
+} from '../services/supabase';
 import { 
   Plus, 
   Baby, 
@@ -15,7 +22,11 @@ import {
   Users,
   Camera,
   Trash2,
-  FileText
+  FileText,
+  AlertTriangle,
+  Bell,
+  Check,
+  BookOpen
 } from 'lucide-react';
 import SocialWall from '../components/SocialWall';
 import SelfieCapture from '../components/SelfieCapture';
@@ -25,10 +36,13 @@ export default function ResponsavelDashboard({ user }) {
   const { signOut } = useAuth();
   const [children, setChildren] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeEmergencies, setActiveEmergencies] = useState([]);
+  const [diariosByChild, setDiariosByChild] = useState({});
   const [showAddForm, setShowAddForm] = useState(false);
   const [childName, setChildName] = useState('');
   const [childBirthdate, setChildBirthdate] = useState('');
   const [childNickname, setChildNickname] = useState('');
+  const [childAlergias, setChildAlergias] = useState('');
   const [neurodivergente, setNeurodivergente] = useState(false);
   const [neurodivergenciaDetalhe, setNeurodivergenciaDetalhe] = useState('');
   const [comoAcalmar, setComoAcalmar] = useState('');
@@ -47,6 +61,38 @@ export default function ResponsavelDashboard({ user }) {
   const [authSelfie, setAuthSelfie] = useState('');
   const [savingAuth, setSavingAuth] = useState(false);
   const [showEditProfile, setShowEditProfile] = useState(false);
+
+  // Escutar chamadas de emergência em tempo real para este responsável
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const unsubscribe = subscribeToChamadasEmergenciaResponsavel(user.uid, (chamadas) => {
+      const ativas = chamadas.filter(c => c.status === 'pendente');
+      setActiveEmergencies(ativas);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  // Carregar Diário de Bordo para os filhos do responsável
+  useEffect(() => {
+    if (children.length === 0) return;
+
+    const fetchDiarios = async () => {
+      const map = {};
+      for (const child of children) {
+        try {
+          const logs = await getDiarioBordoByFilho(child.id);
+          map[child.id] = logs;
+        } catch (e) {
+          console.error(e);
+        }
+      }
+      setDiariosByChild(map);
+    };
+
+    fetchDiarios();
+  }, [children]);
 
   // Escutar filhos no Supabase
   useEffect(() => {
@@ -124,6 +170,7 @@ export default function ResponsavelDashboard({ user }) {
         neurodivergente,
         neurodivergenciaDetalhe: neurodivergente ? neurodivergenciaDetalhe : '',
         comoAcalmar,
+        alergias: childAlergias,
         termoAceito,
         selfie: childSelfie
       });
@@ -131,6 +178,7 @@ export default function ResponsavelDashboard({ user }) {
       setChildName('');
       setChildBirthdate('');
       setChildNickname('');
+      setChildAlergias('');
       setNeurodivergente(false);
       setNeurodivergenciaDetalhe('');
       setComoAcalmar('');
@@ -215,6 +263,69 @@ export default function ResponsavelDashboard({ user }) {
           <LogOut size={16} />
         </button>
       </header>
+
+      {/* ALERTA DE CHAMADA DE EMERGÊNCIA EM TEMPO REAL */}
+      {activeEmergencies.length > 0 && (
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.95) 0%, rgba(220, 38, 38, 0.95) 100%)',
+          border: '2px solid #fee2e2',
+          borderRadius: '16px',
+          padding: '1.2rem',
+          marginBottom: '1rem',
+          color: '#fff',
+          boxShadow: '0 10px 25px rgba(239, 68, 68, 0.4)',
+          animation: 'pulse 2s infinite'
+        }}>
+          {activeEmergencies.map(call => (
+            <div key={call.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <Bell size={24} style={{ color: '#fff', animation: 'bounce 1s infinite' }} />
+                <div>
+                  <h3 className="heading-font" style={{ margin: 0, fontSize: '1.1rem', color: '#fff' }}>
+                    🚨 SOLICITAÇÃO DE PRESENÇA URGENTE!
+                  </h3>
+                  <span style={{ fontSize: '0.85rem', color: '#fee2e2' }}>
+                    Criança: <strong>{call.filho?.nome}</strong>
+                  </span>
+                </div>
+              </div>
+
+              <p style={{ margin: 0, fontSize: '0.9rem', background: 'rgba(0,0,0,0.2)', padding: '0.6rem 0.8rem', borderRadius: '8px' }}>
+                <strong>Motivo informado pela equipe:</strong> {call.motivo}
+              </p>
+
+              <button
+                onClick={async () => {
+                  try {
+                    await atenderChamadaEmergencia(call.id);
+                    alert('Resposta enviada à equipe! Por favor, dirija-se à salinha.');
+                  } catch (e) {
+                    alert('Erro ao confirmar: ' + e.message);
+                  }
+                }}
+                className="btn"
+                style={{
+                  background: '#fff',
+                  color: '#dc2626',
+                  fontWeight: 700,
+                  fontSize: '0.9rem',
+                  padding: '0.6rem 1rem',
+                  borderRadius: '10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem',
+                  marginTop: '0.4rem',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+                }}
+              >
+                <Check size={20} />
+                <span>Estou a caminho! (Atender Chamada)</span>
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Parent Welcome Bar */}
       <div className="vol-profile-bar" style={{ background: 'rgba(255, 255, 255, 0.01)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -329,6 +440,20 @@ export default function ResponsavelDashboard({ user }) {
               </div>
 
               <div className="form-group">
+                <label className="form-label">Alergias ou Restrições Alimentares / Médicas</label>
+                <div className="input-wrapper">
+                  <input
+                    type="text"
+                    placeholder="Ex: Amendoim, Lactose, Dipirona, nenhuma..."
+                    className="form-input"
+                    value={childAlergias}
+                    onChange={(e) => setChildAlergias(e.target.value)}
+                  />
+                  <AlertTriangle className="input-icon" size={18} />
+                </div>
+              </div>
+
+              <div className="form-group">
                 <label className="form-label">Possui alguma neurodivergência?</label>
                 <select 
                   className="form-input" 
@@ -433,6 +558,12 @@ export default function ResponsavelDashboard({ user }) {
                       <div>
                         <span className="kid-name">{child.nome}</span>
                         <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{child.idade} {child.idade === 1 ? 'ano' : 'anos'}</p>
+                        {child.alergias && (
+                          <div style={{ marginTop: '0.2rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.7rem', color: '#ef4444', background: 'rgba(239, 68, 68, 0.1)', padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
+                            <AlertTriangle size={10} />
+                            <span><strong>Alergia:</strong> {child.alergias}</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                     <button 
@@ -659,6 +790,42 @@ export default function ResponsavelDashboard({ user }) {
                             </button>
                           </form>
                         )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Diário de Bordo do Culto (Feedback para os Pais) */}
+                  <div style={{ borderTop: '1px solid var(--border-color)', marginTop: '0.75rem', paddingTop: '0.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.4rem' }}>
+                      <BookOpen size={14} style={{ color: 'var(--accent-primary)' }} />
+                      <strong style={{ fontSize: '0.8rem', color: '#fff' }}>Diário de Bordo do Culto</strong>
+                    </div>
+
+                    {!diariosByChild[child.id] || diariosByChild[child.id].length === 0 ? (
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                        Nenhuma observação registrada pela equipe no último culto.
+                      </span>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                        {diariosByChild[child.id].slice(0, 2).map(log => (
+                          <div key={log.id} style={{ background: 'rgba(255,255,255,0.02)', padding: '0.5rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginBottom: '0.2rem' }}>
+                              {new Date(log.created_at).toLocaleDateString('pt-BR')} • Tia/Tio: {log.voluntario?.nome || 'Equipe'}
+                            </div>
+                            {log.tags && log.tags.length > 0 && (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem', marginBottom: '0.2rem' }}>
+                                {log.tags.map((t, idx) => (
+                                  <span key={idx} style={{ fontSize: '0.65rem', background: 'rgba(14, 165, 233, 0.15)', color: '#7dd3fc', padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
+                                    {t}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                            {log.observacoes && (
+                              <p style={{ margin: 0, fontSize: '0.75rem', color: '#fff' }}>{log.observacoes}</p>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>

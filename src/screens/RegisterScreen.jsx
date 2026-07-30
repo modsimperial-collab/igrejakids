@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import SelfieCapture from '../components/SelfieCapture';
+import DocumentUpload from '../components/DocumentUpload';
 import { 
   User, 
   Mail, 
@@ -36,6 +37,7 @@ export default function RegisterScreen({ onNavigateToLogin }) {
   const [selfie, setSelfie] = useState(null);
   const [nomeIgreja, setNomeIgreja] = useState('');
   const [ministerio, setMinisterio] = useState('');
+  const [antecedentes, setAntecedentes] = useState(null);
   const [voluntarioTermoAceito, setVoluntarioTermoAceito] = useState(false);
 
   // Novos campos para a Criança do Responsável
@@ -104,6 +106,10 @@ export default function RegisterScreen({ onNavigateToLogin }) {
         setError('Por favor, tire ou envie uma selfie para identificação visual.');
         return;
       }
+      if (!antecedentes) {
+        setError('É obrigatório anexar a Certidão de Antecedentes Criminais para o cadastro de voluntário.');
+        return;
+      }
       if (!voluntarioTermoAceito) {
         setError('Você precisa ler e aceitar o Termo de Compromisso e Responsabilidade do Voluntário.');
         return;
@@ -131,6 +137,7 @@ export default function RegisterScreen({ onNavigateToLogin }) {
       } : {
         ministerio,
         selfie,
+        antecedentesCriminais: antecedentes,
         voluntarioTermoAceito
       };
 
@@ -372,6 +379,15 @@ export default function RegisterScreen({ onNavigateToLogin }) {
 
               {/* Captura de Selfie do Voluntário */}
               <SelfieCapture onCapture={setSelfie} initialValue={selfie} />
+
+              {/* Anexo de Antecedentes Criminais (Obrigatório) */}
+              <DocumentUpload
+                label="Certidão de Antecedentes Criminais"
+                onUpload={setAntecedentes}
+                initialValue={antecedentes}
+                required={true}
+                disabled={loading}
+              />
             </div>
           </div>
         )}

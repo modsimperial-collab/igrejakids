@@ -177,7 +177,7 @@ export const subscribeToChildren = (responsavelId, callback) => {
 /**
  * Adicionar uma nova criança na tabela 'filhos' referenciando o responsável
  */
-export const addChild = async (responsavelId, { nome, dataNascimento, apelido, neurodivergente, neurodivergenciaDetalhe, comoAcalmar, termoAceito, selfie }) => {
+export const addChild = async (responsavelId, { nome, dataNascimento, apelido, neurodivergente, neurodivergenciaDetalhe, comoAcalmar, alergias, termoAceito, selfie }) => {
   let calculatedAge = 0;
   if (dataNascimento) {
     const birth = new Date(dataNascimento);
@@ -201,6 +201,7 @@ export const addChild = async (responsavelId, { nome, dataNascimento, apelido, n
         neurodivergente: !!neurodivergente,
         neurodivergencia_detalhe: neurodivergente ? neurodivergenciaDetalhe : '',
         como_acalmar: comoAcalmar || '',
+        alergias: alergias || '',
         termo_aceito: !!termoAceito,
         selfie: selfie || null,
         data_cadastro: new Date().toISOString()
@@ -225,6 +226,10 @@ export const registrarPresenca = async (filhoId, responsavelId, voluntarioId) =>
     .order('data_registro', { ascending: false })
     .limit(1);
 
+  if (fetchError && fetchError.message?.includes('schema cache')) {
+    throw new Error("A tabela 'registro_presencas' ainda não foi criada no banco de dados Supabase. Execute o script 'schema.sql' no SQL Editor do Supabase.");
+  }
+
   let novoTipo = 'entrada';
   if (!fetchError && ultimas && ultimas.length > 0) {
     if (ultimas[0].tipo_transacao === 'entrada') {
@@ -245,7 +250,12 @@ export const registrarPresenca = async (filhoId, responsavelId, voluntarioId) =>
     ])
     .select();
 
-  if (error) throw new Error(error.message);
+  if (error) {
+    if (error.message?.includes('schema cache')) {
+      throw new Error("A tabela 'registro_presencas' ainda não foi criada no banco de dados Supabase. Execute o script 'schema.sql' no SQL Editor do Supabase.");
+    }
+    throw new Error(error.message);
+  }
   return data[0];
 };
 
@@ -260,7 +270,7 @@ export const subscribeToDailyAttendance = (callback) => {
         id,
         tipo_transacao,
         data_registro,
-        filho:filho_id(id, nome, data_nascimento, apelido, neurodivergente, neurodivergencia_detalhe, como_acalmar, selfie),
+        filho:filho_id(id, nome, data_nascimento, apelido, neurodivergente, neurodivergencia_detalhe, como_acalmar, alergias, selfie),
         responsavel:responsavel_id(uid, nome, telefone),
         voluntario:voluntario_id(uid, nome)
       `)
@@ -270,7 +280,10 @@ export const subscribeToDailyAttendance = (callback) => {
     if (!error && data) {
       callback(data);
     } else if (error) {
-      console.error("Erro ao carregar presenças do dia:", error);
+      if (!error.message?.includes('schema cache')) {
+        console.error("Erro ao carregar presenças do dia:", error);
+      }
+      callback([]);
     }
   };
 
@@ -305,7 +318,12 @@ export const obterEstatisticasFilho = async (filhoId) => {
     .eq('tipo_transacao', 'entrada')
     .order('data_registro', { ascending: false });
 
-  if (error) throw new Error(error.message);
+  if (error) {
+    if (error.message?.includes('schema cache')) {
+      return { totalCheckins: 0, ultimoCheckin: null, diasAusente: null };
+    }
+    throw new Error(error.message);
+  }
 
   const totalCheckins = data ? data.length : 0;
   
@@ -335,4 +353,241 @@ export const obterEstatisticasFilho = async (filhoId) => {
     ultimoCheckin,
     diasAusente
   };
+};
+
+/**
+ * 1. Diário de Bordo (Feedback do Culto)
+ */
+export const saveDiarioBordo = async (filhoId, voluntarioId, tags, observacoes) => {
+  const { data, error } = await supabase
+    .from('diario_bordo')
+    .insert([{
+      filho_id: filhoId,
+      voluntario_id: voluntarioId,
+      tags: tags || [],
+      observacoes: observacoes || '',
+      data_registro: new Date().toISOString()
+    }])
+    .select();
+
+  if (error) throw new Error(error.message);
+  return data[0];
+};
+
+export const getDiarioBordoByFilho = async (filhoId) => {
+  const { data, error } = await supabase
+    .from('diario_bordo')
+    .select(`
+      id,
+      tags,
+      observacoes,
+      data_registro,
+      voluntario:voluntario_id(uid, nome)
+    `)
+    .eq('filho_id', filhoId)
+    .order('data_registro', { ascending: false });
+
+  if (error) {
+    if (error.message?.includes('schema cache') || error.message?.includes('does not exist')) return [];
+    throw new Error(error.message);
+  }
+  return data || [];
+};
+
+/**
+ * 2. Chamadas de Emergência em Tempo Real
+ */
+export const solicitarChamadaEmergencia = async (filhoId, responsavelId, voluntarioId, motivo) => {
+  const { data, error } = await supabase
+    .from('chamadas_emergencia')
+    .insert([{
+      filho_id: filhoId,
+      responsavel_id: responsavelId,
+      voluntario_id: voluntarioId,
+      motivo,
+      status: 'ativa',
+      data_chamada: new Date().toISOString()
+    }])
+    .select();
+
+  if (error) throw new Error(error.message);
+  return data[0];
+};
+
+export const atenderChamadaEmergencia = async (chamadaId) => {
+  const { data, error } = await supabase
+    .from('chamadas_emergencia')
+    .update({ status: 'atendida' })
+    .eq('id', chamadaId)
+    .select();
+
+  if (error) throw new Error(error.message);
+  return data[0];
+};
+
+export const subscribeToChamadasEmergencia = (responsavelId, callback) => {
+  const fetchChamadas = async () => {
+    let query = supabase
+      .from('chamadas_emergencia')
+      .select(`
+        id,
+        motivo,
+        status,
+        data_chamada,
+        filho:filho_id(id, nome),
+        voluntario:voluntario_id(uid, nome, telefone)
+      `)
+      .eq('status', 'ativa')
+      .order('data_chamada', { ascending: false });
+
+    if (responsavelId) {
+      query = query.eq('responsavel_id', responsavelId);
+    }
+
+    const { data, error } = await query;
+    if (!error && data) {
+      callback(data);
+    }
+  };
+
+  fetchChamadas();
+
+  const channel = supabase
+    .channel('realtime_chamadas_emergencia')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'chamadas_emergencia' },
+      () => fetchChamadas()
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+};
+
+/**
+ * 3. Escala de Voluntários & Trocas
+ */
+export const getTodasEscalas = async () => {
+  const { data, error } = await supabase
+    .from('escala_voluntarios')
+    .select(`
+      id,
+      data_culto,
+      turno,
+      funcao,
+      solicitou_troca,
+      observacao_troca,
+      voluntario:voluntario_id(uid, nome, telefone)
+    `)
+    .order('data_culto', { ascending: true });
+
+  if (error) {
+    if (error.message?.includes('schema cache') || error.message?.includes('does not exist')) return [];
+    throw new Error(error.message);
+  }
+  return data || [];
+};
+
+export const solicitarTrocaEscala = async (escalaId, observacao) => {
+  const { data, error } = await supabase
+    .from('escala_voluntarios')
+    .update({ 
+      solicitou_troca: true,
+      observacao_troca: observacao || 'Solicitado via aplicativo'
+    })
+    .eq('id', escalaId)
+    .select();
+
+  if (error) throw new Error(error.message);
+  return data[0];
+};
+
+export const criarEscala = async ({ voluntarioId, dataCulto, turno, funcao }) => {
+  const { data, error } = await supabase
+    .from('escala_voluntarios')
+    .insert([{
+      voluntario_id: voluntarioId,
+      data_culto: dataCulto,
+      turno: turno || 'Manhã',
+      funcao: funcao || 'Recepção / Cuidado'
+    }])
+    .select();
+
+  if (error) throw new Error(error.message);
+  return data[0];
+};
+
+/**
+ * 4. Check-in Express para Visitantes (Primeira Vez)
+ */
+export const cadastrarFilhoExpressVisitante = async ({ nome, dataNascimento, responsavelNome, responsavelTelefone, voluntarioId }) => {
+  // 1. Verificar se existe usuário responsável temporário para o visitante
+  let tempUserId = null;
+  const tempEmail = `visitante_${Date.now()}@igrejakids.temp`;
+
+  // Tentar buscar responsável visitante com o mesmo telefone
+  const { data: usuarioExistente } = await supabase
+    .from('usuarios')
+    .select('uid')
+    .eq('telefone', responsavelTelefone)
+    .maybeSingle();
+
+  if (usuarioExistente) {
+    tempUserId = usuarioExistente.uid;
+  } else {
+    // Criar um usuário visitante na tabela usuarios diretamente
+    const fakeUid = `visitante_${Date.now()}`;
+    const { data: novousuario, error: userError } = await supabase
+      .from('usuarios')
+      .insert([{
+        uid: fakeUid,
+        nome: `${responsavelNome} (Visitante)`,
+        email: tempEmail,
+        tipo_usuario: 'responsavel',
+        aprovado: true,
+        telefone: responsavelTelefone,
+        membro_igreja: false
+      }])
+      .select();
+
+    if (userError) throw new Error(userError.message);
+    tempUserId = novousuario[0].uid;
+  }
+
+  // 2. Cadastrar filho marcado como visitante
+  let calculatedAge = 0;
+  if (dataNascimento) {
+    const birth = new Date(dataNascimento);
+    const today = new Date();
+    calculatedAge = today.getFullYear() - birth.getFullYear();
+  }
+
+  const { data: novoFilho, error: filhoError } = await supabase
+    .from('filhos')
+    .insert([{
+      responsavel_id: tempUserId,
+      nome: `${nome} (Visitante)`,
+      data_nascimento: dataNascimento || null,
+      idade: calculatedAge,
+      visitante: true,
+      termo_aceito: true
+    }])
+    .select();
+
+  if (filhoError) throw new Error(filhoError.message);
+
+  // 3. Fazer o check-in automático de entrada
+  await supabase
+    .from('registro_presencas')
+    .insert([{
+      filho_id: novoFilho[0].id,
+      responsavel_id: tempUserId,
+      voluntario_id: voluntarioId,
+      tipo_transacao: 'entrada',
+      data_registro: new Date().toISOString()
+    }]);
+
+  return novoFilho[0];
 };

@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import SocialWall from '../components/SocialWall';
 import SelfieCapture from '../components/SelfieCapture';
+import DocumentUpload from '../components/DocumentUpload';
 
 export default function AdminDashboard({ user }) {
   const { signOut } = useAuth();
@@ -48,6 +49,7 @@ export default function AdminDashboard({ user }) {
   const [editNomeIgreja, setEditNomeIgreja] = useState('');
   const [editSelfie, setEditSelfie] = useState('');
   const [editMinisterio, setEditMinisterio] = useState('');
+  const [editAntecedentes, setEditAntecedentes] = useState(null);
   const [savingUserEdit, setSavingUserEdit] = useState(false);
 
   const startEditing = () => {
@@ -59,6 +61,7 @@ export default function AdminDashboard({ user }) {
     setEditNomeIgreja(selectedUser.nome_igreja || '');
     setEditSelfie(selectedUser.selfie || '');
     setEditMinisterio(selectedUser.ministerio || '');
+    setEditAntecedentes(selectedUser.antecedentes_criminais || null);
     setIsEditingUser(true);
   };
 
@@ -85,6 +88,7 @@ export default function AdminDashboard({ user }) {
         updateData.nome_igreja = editMembro ? editNomeIgreja : '';
       } else if (selectedUser.tipo_usuario === 'voluntario') {
         updateData.ministerio = editMinisterio;
+        updateData.antecedentes_criminais = editAntecedentes;
       }
 
       const { error } = await supabase
@@ -779,16 +783,25 @@ export default function AdminDashboard({ user }) {
 
                 {/* Campos do Voluntário */}
                 {selectedUser.tipo_usuario === 'voluntario' && (
-                  <div className="form-group">
-                    <label className="form-label">Ministério / Igreja de Origem</label>
-                    <input 
-                      type="text" 
-                      className="form-input" 
-                      value={editMinisterio} 
-                      onChange={e => setEditMinisterio(e.target.value)} 
+                  <>
+                    <div className="form-group">
+                      <label className="form-label">Ministério / Igreja de Origem</label>
+                      <input 
+                        type="text" 
+                        className="form-input" 
+                        value={editMinisterio} 
+                        onChange={e => setEditMinisterio(e.target.value)} 
+                        disabled={savingUserEdit}
+                      />
+                    </div>
+                    <DocumentUpload
+                      label="Certidão de Antecedentes Criminais"
+                      onUpload={setEditAntecedentes}
+                      initialValue={editAntecedentes}
+                      required={true}
                       disabled={savingUserEdit}
                     />
-                  </div>
+                  </>
                 )}
 
                 {/* Ações de Edição */}
@@ -899,9 +912,26 @@ export default function AdminDashboard({ user }) {
 
                   {/* Informações Adicionais do Voluntário */}
                   {selectedUser.tipo_usuario === 'voluntario' && (
-                    <p style={{ margin: 0 }}>
-                      <strong style={{ color: '#fff' }}>Ministério / Igreja de Origem:</strong> {selectedUser.ministerio || 'Não informado'}
-                    </p>
+                    <>
+                      <p style={{ margin: 0 }}>
+                        <strong style={{ color: '#fff' }}>Ministério / Igreja de Origem:</strong> {selectedUser.ministerio || 'Não informado'}
+                      </p>
+                      <div style={{ marginTop: '0.5rem' }}>
+                        <strong style={{ color: '#fff', display: 'block', marginBottom: '0.35rem' }}>Antecedentes Criminais:</strong>
+                        {selectedUser.antecedentes_criminais ? (
+                          <DocumentUpload 
+                            label="Certidão de Antecedentes"
+                            initialValue={selectedUser.antecedentes_criminais}
+                            disabled={true}
+                            onUpload={() => {}}
+                          />
+                        ) : (
+                          <span style={{ color: '#f87171', fontSize: '0.8rem', fontStyle: 'italic' }}>
+                            ⚠️ Documento de antecedentes não anexado
+                          </span>
+                        )}
+                      </div>
+                    </>
                   )}
                 </div>
 

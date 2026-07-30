@@ -54,6 +54,7 @@ export const AuthProvider = ({ children }) => {
           newProfileObj.nome_igreja = metadata.nome_igreja || '';
         } else if (tipoUsuario === 'voluntario') {
           newProfileObj.ministerio = metadata.ministerio || '';
+          newProfileObj.antecedentes_criminais = metadata.antecedentes_criminais || null;
           newProfileObj.termo_aceito = !!metadata.voluntario_termo_aceito;
         }
 
@@ -198,6 +199,7 @@ export const AuthProvider = ({ children }) => {
           nome_igreja: extraData.membroIgreja ? (extraData.nomeIgreja || '') : '',
           selfie: extraData.selfie || null,
           ministerio: extraData.ministerio || '',
+          antecedentes_criminais: extraData.antecedentesCriminais || null,
           voluntario_termo_aceito: !!extraData.voluntarioTermoAceito,
           
           // Dados do Filho
@@ -207,6 +209,7 @@ export const AuthProvider = ({ children }) => {
           child_neurodivergente: !!extraData.neurodivergente,
           child_neurodivergencia_detalhe: extraData.neurodivergente ? (extraData.neurodivergenciaDetalhe || '') : '',
           child_como_acalmar: extraData.comoAcalmar || '',
+          child_alergias: extraData.alergias || '',
           child_termo_aceito: !!extraData.termoAceito,
           child_selfie: extraData.childSelfie || null
         }
@@ -244,6 +247,7 @@ export const AuthProvider = ({ children }) => {
           } else if (tipoUsuario === 'voluntario') {
             userPayload.ministerio = extraData.ministerio || '';
             userPayload.selfie = extraData.selfie || null;
+            userPayload.antecedentes_criminais = extraData.antecedentesCriminais || null;
             userPayload.termo_aceito = !!extraData.voluntarioTermoAceito;
           }
 
