@@ -58,7 +58,6 @@ export const subscribeToVolunteers = (aprovado, callback) => {
   supabase
     .from('usuarios')
     .select('*')
-    .neq('tipo_usuario', 'admin')
     .eq('aprovado', aprovado)
     .order('nome', { ascending: true })
     .then(({ data, error }) => {
@@ -81,7 +80,6 @@ export const subscribeToVolunteers = (aprovado, callback) => {
         const { data, error } = await supabase
           .from('usuarios')
           .select('*')
-          .neq('tipo_usuario', 'admin')
           .eq('aprovado', aprovado)
           .order('nome', { ascending: true });
         if (!error && data) {
@@ -111,11 +109,41 @@ export const approveVolunteer = async (uid) => {
  * Recusar/Remover voluntário (exclui o registro dele no banco de dados)
  */
 export const rejectVolunteer = async (uid) => {
-  const { error } = await supabase
-    .from('usuarios')
-    .delete()
-    .eq('uid', uid);
-  if (error) throw new Error(error.message);
+  try {
+    // 1. Buscar filhos associados para deletar dependências de autorizados e presenças
+    const { data: userChildren } = await supabase.from('filhos').select('id').eq('responsavel_id', uid);
+    if (userChildren && userChildren.length > 0) {
+      const childIds = userChildren.map(c => c.id);
+      await supabase.from('autorizados_retirada').delete().in('filho_id', childIds);
+      await supabase.from('registro_presencas').delete().in('filho_id', childIds);
+      await supabase.from('diario_bordo').delete().in('filho_id', childIds);
+      await supabase.from('chamadas_emergencia').delete().in('filho_id', childIds);
+    }
+
+    // 2. Limpar tabelas vinculadas ao UID do usuário
+    await supabase.from('filhos').delete().eq('responsavel_id', uid);
+    await supabase.from('escala_voluntarios').delete().eq('voluntario_id', uid);
+    await supabase.from('registro_presencas').delete().eq('responsavel_id', uid);
+    await supabase.from('registro_presencas').delete().eq('voluntario_id', uid);
+    await supabase.from('chamadas_emergencia').delete().eq('responsavel_id', uid);
+    await supabase.from('chamadas_emergencia').delete().eq('voluntario_id', uid);
+    await supabase.from('comentarios').delete().eq('autor_id', uid);
+    await supabase.from('posts').delete().eq('autor_id', uid);
+
+    // 3. Excluir o usuário da tabela public.usuarios
+    const { error } = await supabase
+      .from('usuarios')
+      .delete()
+      .eq('uid', uid);
+
+    if (error) {
+      console.error('Erro ao deletar usuário do Supabase:', error);
+      throw new Error(error.message);
+    }
+  } catch (err) {
+    console.error('Erro no processo de exclusão:', err);
+    throw err;
+  }
 };
 
 /**
@@ -385,12 +413,12 @@ export const subscribeToDailyAttendance = (callback) => {
     }
 
     const formatted = rawData.map(rec => {
-      // Tratar se rec.filho já veio preenchido da query relacional
-      let fObj = (rec.filho && rec.filho.nome && rec.filho.nome !== 'Criança') ? rec.filho : null;
-      let rObj = (rec.responsavel && rec.responsavel.nome) ? rec.responsavel : null;
-      let vObj = (rec.voluntario && rec.voluntario.nome) ? rec.voluntario : null;
+      // 1. Desembalar relacional caso rec.filho, rec.responsavel, rec.voluntario venham como Array (comum no Supabase)
+      const rawFilho = Array.isArray(rec.filho) ? rec.filho[0] : rec.filho;
+      const rawResponsavel = Array.isArray(rec.responsavel) ? rec.responsavel[0] : rec.responsavel;
+      const rawVoluntario = Array.isArray(rec.voluntario) ? rec.voluntario[0] : rec.voluntario;
 
-      // Tratar caso rec.filho_id venha em formato JSON ou com aspas extras
+      // 2. Extrair e limpar o ID da criança
       let cleanFilhoId = rec.filho_id;
       if (typeof rec.filho_id === 'string' && rec.filho_id.startsWith('{')) {
         try {
@@ -398,47 +426,66 @@ export const subscribeToDailyAttendance = (callback) => {
           cleanFilhoId = parsed.childId || parsed.id || rec.filho_id;
         } catch (e) {}
       }
+      if (!cleanFilhoId && rawFilho?.id) {
+        cleanFilhoId = rawFilho.id;
+      }
 
       const fidStr = cleanFilhoId ? String(cleanFilhoId).trim().toLowerCase() : '';
-      const rId = rec.responsavel_id || fObj?.responsavel_id;
+
+      // 3. Definir fObj inicial a partir do rawFilho relacional
+      let fObj = (rawFilho && rawFilho.nome && rawFilho.nome !== 'Criança' && !rawFilho.nome.startsWith('Filho(a)'))
+        ? { ...rawFilho }
+        : null;
+
+      // 4. Se temos o ID e ele existe na tabela filhosMap (busca direta de todos os filhos), dar prioridade TOTAL a ele!
+      if (fidStr && filhosMap[fidStr]) {
+        fObj = { ...(fObj || {}), ...filhosMap[fidStr] };
+      }
+
+      // 5. Tratar responsável
+      let rObj = (rawResponsavel && rawResponsavel.nome) ? { ...rawResponsavel } : null;
+      const rId = rec.responsavel_id || fObj?.responsavel_id || rawResponsavel?.uid;
       const rIdStr = rId ? String(rId).trim().toLowerCase() : '';
 
-      // Tentar encontrar e enriquecer fObj via filhosMap
-      if (fidStr && filhosMap[fidStr]) {
-        fObj = { ...filhosMap[fidStr], ...(fObj || {}) };
+      if (!rObj && rIdStr && usersMap[rIdStr]) {
+        rObj = { ...usersMap[rIdStr] };
       }
 
-      // Fallback: Se a criança não foi encontrada diretamente pelo filho_id, mas temos o responsável
+      // 6. Fallback de criança pelo responsável apenas se a criança ainda não foi encontrada diretamente pelo ID
       if (!fObj && rIdStr && filhosByParentMap[rIdStr] && filhosByParentMap[rIdStr].length > 0) {
         const parentKids = filhosByParentMap[rIdStr];
-        if (parentKids.length === 1) {
-          fObj = parentKids[0];
-        } else {
-          // Se o pai tem múltiplos filhos, tentar encontrar por ID ou nome se disponível
-          const matchedById = parentKids.find(k => String(k.id).toLowerCase() === fidStr);
-          const matchedByName = (rec.filho?.nome && !rec.filho.nome.startsWith('Filho(a)')) ? parentKids.find(k => k.nome.toLowerCase().includes(rec.filho.nome.toLowerCase())) : null;
-          fObj = matchedById || matchedByName || parentKids[0];
-        }
+        const matchedById = fidStr ? parentKids.find(k => String(k.id).trim().toLowerCase() === fidStr) : null;
+        const matchedByName = (rawFilho?.nome && !rawFilho.nome.startsWith('Filho(a)'))
+          ? parentKids.find(k => k.nome.toLowerCase().includes(rawFilho.nome.toLowerCase()))
+          : null;
+        fObj = matchedById || matchedByName || (parentKids.length === 1 ? parentKids[0] : null);
       }
 
-      if (!rObj && rIdStr && usersMap[rIdStr]) {
-        rObj = usersMap[rIdStr];
-      }
-
+      // 7. Tratar voluntário
+      let vObj = (rawVoluntario && rawVoluntario.nome) ? { ...rawVoluntario } : null;
       const vId = rec.voluntario_id;
       const vIdStr = vId ? String(vId).trim().toLowerCase() : '';
       if (!vObj && vIdStr && usersMap[vIdStr]) {
-        vObj = usersMap[vIdStr];
+        vObj = { ...usersMap[vIdStr] };
       }
 
-      // Determinar nome legível para a criança
+      // 8. Determinar nome fallback
       const childNameFallback = fObj?.nome || (rObj?.nome ? `Filho(a) de ${rObj.nome}` : 'Criança');
 
       return {
         ...rec,
         filho: fObj 
           ? { ...fObj }
-          : { id: cleanFilhoId || rec.filho_id, nome: childNameFallback, responsavel_id: rId, selfie: rObj?.selfie || null },
+          : { 
+              id: cleanFilhoId || rec.filho_id, 
+              nome: childNameFallback, 
+              responsavel_id: rId, 
+              selfie: rObj?.selfie || null,
+              neurodivergente: false,
+              neurodivergencia_detalhe: null,
+              como_acalmar: null,
+              alergias: null
+            },
         responsavel: rObj || { uid: rId, nome: 'Responsável' },
         voluntario: vObj || { uid: rec.voluntario_id, nome: 'Voluntário' }
       };

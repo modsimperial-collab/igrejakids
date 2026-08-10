@@ -70,6 +70,7 @@ export default function AdminDashboard({ user }) {
   const [editSelfie, setEditSelfie] = useState('');
   const [editMinisterio, setEditMinisterio] = useState('');
   const [editAntecedentes, setEditAntecedentes] = useState(null);
+  const [editTipoUsuario, setEditTipoUsuario] = useState('voluntario');
   const [savingUserEdit, setSavingUserEdit] = useState(false);
 
   // Estados para Escala de Voluntários
@@ -170,6 +171,7 @@ export default function AdminDashboard({ user }) {
     setEditSelfie(selectedUser.selfie || '');
     setEditMinisterio(selectedUser.ministerio || '');
     setEditAntecedentes(selectedUser.antecedentes_criminais || null);
+    setEditTipoUsuario(selectedUser.tipo_usuario || 'voluntario');
     setIsEditingUser(true);
   };
 
@@ -188,13 +190,21 @@ export default function AdminDashboard({ user }) {
       const updateData = {
         nome: editName,
         selfie: editSelfie,
+        tipo_usuario: editTipoUsuario
       };
-      if (selectedUser.tipo_usuario === 'responsavel') {
+
+      if (editTipoUsuario === 'admin') {
+        updateData.aprovado = true;
+      }
+
+      if (editTipoUsuario === 'responsavel' || selectedUser.tipo_usuario === 'responsavel') {
         updateData.telefone = editPhone;
         updateData.endereco = editAddress;
         updateData.membro_igreja = editMembro;
         updateData.nome_igreja = editMembro ? editNomeIgreja : '';
-      } else if (selectedUser.tipo_usuario === 'voluntario') {
+      }
+      
+      if (editTipoUsuario === 'voluntario' || selectedUser.tipo_usuario === 'voluntario') {
         updateData.ministerio = editMinisterio;
         updateData.antecedentes_criminais = editAntecedentes;
       }
@@ -212,12 +222,36 @@ export default function AdminDashboard({ user }) {
         ...updateData
       }));
       setIsEditingUser(false);
-      alert("Cadastro atualizado com sucesso!");
+      alert("Cadastro e permissões atualizados com sucesso!");
     } catch (err) {
       console.error("Erro ao salvar alterações do usuário:", err);
       alert("Erro ao salvar alterações: " + err.message);
     } finally {
       setSavingUserEdit(false);
+    }
+  };
+
+  const handlePromoverAdmin = async (uid, currentRole) => {
+    const isTargetAdmin = currentRole === 'admin';
+    const actionText = isTargetAdmin 
+      ? 'Deseja remover as permissões de Administrador deste usuário e alterá-lo para Voluntário?'
+      : 'Deseja promover este usuário a Administrador Mestre? Ele passará a ter acesso total ao painel de administração do Igreja Kids.';
+
+    if (!window.confirm(actionText)) return;
+
+    try {
+      const newRole = isTargetAdmin ? 'voluntario' : 'admin';
+      const { error } = await supabase
+        .from('usuarios')
+        .update({ tipo_usuario: newRole, aprovado: true })
+        .eq('uid', uid);
+
+      if (error) throw error;
+
+      alert(newRole === 'admin' ? 'Usuário promovido a Administrador Mestre com sucesso!' : 'Permissão alterada para Voluntário com sucesso!');
+      setSelectedUser(prev => prev ? { ...prev, tipo_usuario: newRole, aprovado: true } : null);
+    } catch (err) {
+      alert('Erro ao alterar permissão do usuário: ' + err.message);
     }
   };
 
@@ -389,14 +423,14 @@ export default function AdminDashboard({ user }) {
   };
 
   const handleExcluirCadastro = async (uid) => {
-    if (window.confirm('Deseja realmente EXCLUIR DEFINITIVAMENTE este cadastro? Esta ação é irreversível e removerá o usuário do sistema.')) {
+    if (!uid) return;
+    if (window.confirm('Deseja realmente EXCLUIR DEFINITIVAMENTE este cadastro? Esta ação é irreversível e removerá o usuário e todos os dados associados do sistema.')) {
       try {
         await rejectVolunteer(uid);
-        if (selectedUser?.uid === uid) {
-          setSelectedUser(null);
-        }
+        closeUserModal();
         alert('Cadastro excluído com sucesso!');
       } catch (error) {
+        console.error('Erro ao excluir cadastro:', error);
         alert('Erro ao excluir cadastro: ' + error.message);
       }
     }
@@ -1198,10 +1232,11 @@ export default function AdminDashboard({ user }) {
                           fontSize: '0.7rem', 
                           padding: '1px 6px', 
                           borderRadius: '10px', 
-                          background: vol.tipo_usuario === 'responsavel' ? 'rgba(236, 72, 153, 0.15)' : 'rgba(99, 102, 241, 0.15)',
-                          color: vol.tipo_usuario === 'responsavel' ? '#f472b6' : '#a5b4fc'
+                          background: vol.tipo_usuario === 'responsavel' ? 'rgba(236, 72, 153, 0.15)' : vol.tipo_usuario === 'admin' ? 'rgba(251, 191, 36, 0.15)' : 'rgba(99, 102, 241, 0.15)',
+                          color: vol.tipo_usuario === 'responsavel' ? '#f472b6' : vol.tipo_usuario === 'admin' ? '#fbbf24' : '#a5b4fc',
+                          fontWeight: vol.tipo_usuario === 'admin' ? 600 : 400
                         }}>
-                          {vol.tipo_usuario === 'responsavel' ? 'Responsável' : 'Voluntário'}
+                          {vol.tipo_usuario === 'responsavel' ? 'Responsável' : vol.tipo_usuario === 'admin' ? '👑 Admin' : 'Voluntário'}
                         </span>
                       </div>
                     </div>
@@ -1247,10 +1282,11 @@ export default function AdminDashboard({ user }) {
                           fontSize: '0.7rem', 
                           padding: '1px 6px', 
                           borderRadius: '10px', 
-                          background: vol.tipo_usuario === 'responsavel' ? 'rgba(236, 72, 153, 0.15)' : 'rgba(99, 102, 241, 0.15)',
-                          color: vol.tipo_usuario === 'responsavel' ? '#f472b6' : '#a5b4fc'
+                          background: vol.tipo_usuario === 'responsavel' ? 'rgba(236, 72, 153, 0.15)' : vol.tipo_usuario === 'admin' ? 'rgba(251, 191, 36, 0.15)' : 'rgba(99, 102, 241, 0.15)',
+                          color: vol.tipo_usuario === 'responsavel' ? '#f472b6' : vol.tipo_usuario === 'admin' ? '#fbbf24' : '#a5b4fc',
+                          fontWeight: vol.tipo_usuario === 'admin' ? 600 : 400
                         }}>
-                          {vol.tipo_usuario === 'responsavel' ? 'Responsável' : 'Voluntário'}
+                          {vol.tipo_usuario === 'responsavel' ? 'Responsável' : vol.tipo_usuario === 'admin' ? '👑 Admin' : 'Voluntário'}
                         </span>
                       </div>
                     </div>
@@ -1360,6 +1396,21 @@ export default function AdminDashboard({ user }) {
                     onChange={e => setEditName(e.target.value)} 
                     disabled={savingUserEdit}
                   />
+                </div>
+
+                {/* Tipo de Perfil / Permissão */}
+                <div className="form-group">
+                  <label className="form-label">Tipo de Perfil (Permissão)</label>
+                  <select 
+                    className="form-input" 
+                    value={editTipoUsuario} 
+                    onChange={e => setEditTipoUsuario(e.target.value)} 
+                    disabled={savingUserEdit}
+                  >
+                    <option value="responsavel">Responsável (Pais / Tutores)</option>
+                    <option value="voluntario">Voluntário</option>
+                    <option value="admin">👑 Administrador Mestre</option>
+                  </select>
                 </div>
 
                 {/* Campos do Responsável */}
@@ -1505,10 +1556,11 @@ export default function AdminDashboard({ user }) {
                       fontSize: '0.75rem', 
                       padding: '2px 8px', 
                       borderRadius: '10px', 
-                      background: selectedUser.tipo_usuario === 'responsavel' ? 'rgba(236, 72, 153, 0.15)' : 'rgba(99, 102, 241, 0.15)',
-                      color: selectedUser.tipo_usuario === 'responsavel' ? '#f472b6' : '#a5b4fc'
+                      background: selectedUser.tipo_usuario === 'responsavel' ? 'rgba(236, 72, 153, 0.15)' : selectedUser.tipo_usuario === 'admin' ? 'rgba(251, 191, 36, 0.15)' : 'rgba(99, 102, 241, 0.15)',
+                      color: selectedUser.tipo_usuario === 'responsavel' ? '#f472b6' : selectedUser.tipo_usuario === 'admin' ? '#fbbf24' : '#a5b4fc',
+                      fontWeight: selectedUser.tipo_usuario === 'admin' ? 600 : 400
                     }}>
-                      {selectedUser.tipo_usuario === 'responsavel' ? 'Responsável' : 'Voluntário'}
+                      {selectedUser.tipo_usuario === 'responsavel' ? 'Responsável' : selectedUser.tipo_usuario === 'admin' ? '👑 Administrador Mestre' : 'Voluntário'}
                     </span>
                   </p>
 
@@ -1725,6 +1777,47 @@ export default function AdminDashboard({ user }) {
 
                 {/* Ações Rápidas no Modal */}
                 <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', flexDirection: 'column' }}>
+                  {/* Botão Promover / Despromover Admin */}
+                  {selectedUser.tipo_usuario !== 'admin' ? (
+                    <button 
+                      className="btn" 
+                      onClick={() => handlePromoverAdmin(selectedUser.uid, selectedUser.tipo_usuario)} 
+                      style={{ 
+                        width: '100%', 
+                        background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.25) 0%, rgba(168, 85, 247, 0.25) 100%)', 
+                        border: '1px solid rgba(168, 85, 247, 0.4)', 
+                        color: '#c084fc', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        gap: '0.4rem',
+                        fontWeight: 600,
+                        padding: '0.65rem'
+                      }}
+                    >
+                      <Sparkles size={16} style={{ color: '#fbbf24' }} />
+                      <span>Promover a Administrador Mestre</span>
+                    </button>
+                  ) : (
+                    <button 
+                      className="btn btn-secondary" 
+                      onClick={() => handlePromoverAdmin(selectedUser.uid, selectedUser.tipo_usuario)} 
+                      style={{ 
+                        width: '100%', 
+                        border: '1px solid rgba(245, 158, 11, 0.3)', 
+                        color: '#fbbf24', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        gap: '0.4rem',
+                        padding: '0.65rem'
+                      }}
+                    >
+                      <ShieldAlert size={16} />
+                      <span>Remover Permissão de Admin (Tornar Voluntário)</span>
+                    </button>
+                  )}
+
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <button 
                       className="btn btn-secondary" 
@@ -1760,10 +1853,7 @@ export default function AdminDashboard({ user }) {
 
                   <button 
                     className="btn btn-danger" 
-                    onClick={() => {
-                      handleExcluirCadastro(selectedUser.uid);
-                      closeUserModal();
-                    }} 
+                    onClick={() => handleExcluirCadastro(selectedUser.uid)} 
                     style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
                   >
                     <Trash2 size={16} />
