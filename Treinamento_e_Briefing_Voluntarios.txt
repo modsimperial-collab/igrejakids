@@ -1,0 +1,147 @@
+================================================================================
+          MANUAL DE TREINAMENTO E BRIEFING PARA VOLUNTÁRIOS
+                       SISTEMA IGREJA KIDS
+              Igreja da Criança - AD Madureira
+================================================================================
+
+BEM-VINDO(A) À EQUIPE DO MINISTÉRIO INFANTIL!
+Este documento contém o briefing completo e o roteiro de treinamento para a 
+apresentação do sistema Igreja Kids. Utilize este guia para capacitar os 
+voluntários, garantindo segurança, organização e excelência no cuidado com 
+nossas crianças.
+
+--------------------------------------------------------------------------------
+1. PROPÓSITO E VISÃO GERAL DO SISTEMA IGREJA KIDS
+--------------------------------------------------------------------------------
+O Igreja Kids é a plataforma oficial de gestão e segurança do nosso Ministério 
+Infantil. Ele foi desenvolvido com três pilares fundamentais:
+
+  1. SEGURANÇA MÁXIMA: Controle rigoroso de entrada e saída por QR Code, fotos 
+     de identificação (selfies) e lista de pessoas autorizadas a retirar a criança.
+  2. ATENDIMENTO PASTORAL E INCLUSÃO: Registro detalhado de crianças 
+     neurodivergentes (como acalmar em crise), alergias e diário de bordo.
+  3. ORGANIZAÇÃO DA EQUIPE: Escala de voluntários transparente, gestão de trocas 
+     de turno e comunicação direta via Mural de Avisos.
+
+--------------------------------------------------------------------------------
+2. ESTRUTURA DE PERFIS DE ACESSO
+--------------------------------------------------------------------------------
+O sistema possui 3 tipos de perfis bem definidos:
+
+  • RESPONSÁVEL (Pais/Tutores):
+    - Cadastra os filhos, fotos, alergias e neurodivergências.
+    - Cadastra parentes/amigos autorizados a buscar a criança.
+    - Gera o QR Code de entrada e saída no celular.
+
+  • VOLUNTÁRIO (Você):
+    - Consulta sua escala de serviço e solicita trocas quando necessário.
+    - Realiza Check-In (Entrada) e Check-Out (Saída) das crianças por QR Code.
+    - Visualiza alertas de alergias e orientações para crianças neurodivergentes.
+    - Registra o Diário de Bordo (como a criança passou no culto).
+    - Dispara Chamada de Emergência para os pais no culto principal se necessário.
+
+  • ADMINISTRADOR MESTRE (Liderança):
+    - Aprova novos voluntários e responsáveis.
+    - Promove administradores e gerencia permissões.
+    - Monta as escalas dos cultos e acompanha estatísticas de frequência.
+
+--------------------------------------------------------------------------------
+3. PASSO A PASSO PRÁTICO: O DIA A DIA DO VOLUNTÁRIO
+--------------------------------------------------------------------------------
+
+PASSO 1: PRIMEIRO ACESSO E CADASTRO
+  1. Acesse o aplicativo Igreja Kids.
+  2. Clique em "Criar Conta" e selecione o perfil "Voluntário".
+  3. Preencha seus dados: Nome, E-mail, Senha, Telefone e Ministério de Origem.
+  4. Anexe a Certidão de Antecedentes Criminais (obrigatório para a segurança das crianças).
+  5. Aguarde a aprovação da sua conta pela liderança (Administrador).
+
+PASSO 2: CONSULTA DA ESCALA E TROCA DE CULTO
+  1. No painel do voluntário, acesse a aba "Escala".
+  2. Verifique os dias e turnos (Manhã/Noite) em que você foi escalado(a).
+  3. Tive um imprevisto! O que fazer?
+     - Clique em "Solicitar Troca de Culto" na sua escala.
+     - Informe o motivo brevemente.
+     - Outro voluntário disponível poderá aceitar a troca diretamente no app.
+
+PASSO 3: CHEGADA AO CULTO E RECEPÇÃO (CHECK-IN DE ENTRADA)
+  • Horário: Chegar sempre 15 minutos antes do início do culto para oração e alinhamento.
+  • No momento do Check-In:
+     1. Acesse a aba "Supervisão / Check-In".
+     2. Aponte a câmera do dispositivo para o QR Code no celular do responsável 
+        (ou busque pelo nome da criança na lista).
+     3. CONFERÊNCIA OBRIGATÓRIA:
+        - Confirme a foto (selfie) da criança e do responsável na tela.
+        - Verifique se a criança possui alertas vermelhos de ALERGIAS.
+        - Se a criança for NEURODIVERGENTE, leia atentamente a instrução: 
+          "Como acalmar em crise".
+     4. Clique em "Confirmar Entrada".
+
+PASSO 4: CUIDADO DURANTE O CULTO E DIÁRIO DE BORDO
+  • Durante as atividades, preste atenção nas necessidades de cada criança.
+  • Registro do Diário de Bordo:
+     - No perfil da criança no app, selecione as tags de feedback:
+       [Lanchou bem] [Participou das brincadeiras] [Prestou atenção na historinha]
+     - Adicione observações se houver algo relevante.
+  • O que fazer em caso de emergência ou choro incontrolável?
+     - Clique no botão "Chamar Responsável / Emergência".
+     - O sistema enviará um alerta visual para o painel dos pais ou notificará 
+       a equipe de apoio no culto principal.
+
+PASSO 5: DEVOLUÇÃO E SEGURANÇA (CHECK-OUT DE SAÍDA)
+  • REGRA DE OURO DA SEGURANÇA: NUNCA entregue uma criança sem a leitura do QR Code 
+    e a validação visual do responsável ou pessoa autorizada!
+  • Procedimento:
+     1. O responsável/autorizado apresenta o QR Code de Saída.
+     2. Escaneie o QR Code no sistema.
+     3. O app exibirá as pessoas autorizadas a retirar a criança com foto e documento.
+     4. Confirme se a pessoa que veio buscar corresponde à foto na tela.
+     5. Clique em "Confirmar Saída (Check-Out)".
+
+--------------------------------------------------------------------------------
+4. ROTEIRO SUGERIDO PARA A REUNIÃO DE TREINAMENTO (APRESENTAÇÃO)
+--------------------------------------------------------------------------------
+Tempo estimado: 45 minutos
+
+  [00:00 - 00:10] ABERTURA E ORAÇÃO
+    • Boas-vindas da liderança.
+    • Leitura de versículo bíblico sobre o valor das crianças (Ex: Mateus 19:14).
+    • Apresentação do propósito: Proteger, cuidar e edificar os pequeninos.
+
+  [00:10 - 00:25] DEMONSTRAÇÃO PRÁTICA DO APLICATIVO
+    • Projetar a tela do celular/computador ou mostrar passo a passo.
+    • Simular um Check-in de entrada ao vivo.
+    • Mostrar o alerta de neurodivergência e alergias.
+    • Simular o Check-out de saída com a checagem da foto.
+
+  [00:25 - 00:35] NORMAS DE SEGURANÇA E CONDUTA
+    • Pontualidade e compromisso com a escala.
+    • Importância da Certidão de Antecedentes Criminais.
+    • Proibição de entregar crianças a pessoas não cadastradas no app.
+    • Cuidado, paciência e amor no atendimento de crianças neurodivergentes.
+
+  [00:35 - 00:45] TIRA-DÚVIDAS E CADASTRO INICIAL
+    • Ajudar os voluntários a baixar o app e realizar o cadastro inicial.
+    • Aprovação dos cadastros ao vivo pelo Administrador Mestre.
+    • Oração final de consagração da equipe.
+
+--------------------------------------------------------------------------------
+5. PERGUNTAS FREQUENTES (FAQ DO VOLUNTÁRIO)
+--------------------------------------------------------------------------------
+
+P: E se a bateria do celular do pai acabar na hora da saída?
+R: O voluntário busca o nome do pai/mãe na busca manual do app, valida a foto 
+   do responsável e o documento de identidade antes de liberar a criança.
+
+P: Um tio ou avô que não mora na mesma casa pode buscar a criança?
+R: Somente se o pai/mãe tiver adicionado previamente essa pessoa na aba "Pessoas 
+   Autorizadas a Retirar" dentro do cadastro da criança.
+
+P: Não poderei ir no meu dia de escala, o que faço?
+R: Solicite a troca pelo aplicativo com no mínimo 24h de antecedência para que 
+   outro voluntário possa assumir seu turno.
+
+================================================================================
+              "Ensina a criança no caminho em que deve andar..." 
+                              Provérbios 22:6
+================================================================================
