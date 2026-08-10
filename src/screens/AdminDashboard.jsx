@@ -12,6 +12,9 @@ import {
   deletarEscala,
   substituirVoluntarioEscala,
   recusarSolicitacaoTroca,
+  subscribeToProgramacaoCultos,
+  criarProgramacaoCulto,
+  deletarProgramacaoCulto,
   supabase
 } from '../services/supabase';
 import { 
@@ -22,6 +25,7 @@ import {
   Check, 
   Trash2, 
   ShieldAlert,
+  Mic,
   LogOut,
   Sparkles,
   Clock,
@@ -83,6 +87,59 @@ export default function AdminDashboard({ user }) {
   const [savingEscala, setSavingEscala] = useState(false);
   const [replacingEscalaId, setReplacingEscalaId] = useState(null);
   const [replacementVolunteerId, setReplacementVolunteerId] = useState('');
+
+  // Estados para Programação de Cultos e Pregadores
+  const [programacaoCultos, setProgramacaoCultos] = useState([]);
+  const [pregadorNome, setPregadorNome] = useState('');
+  const [pregadorTema, setPregadorTema] = useState('');
+  const [pregadorData, setPregadorData] = useState('');
+  const [pregadorTurno, setPregadorTurno] = useState('Manhã');
+  const [pregadorObs, setPregadorObs] = useState('');
+  const [savingPregador, setSavingPregador] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToProgramacaoCultos((list) => {
+      setProgramacaoCultos(list);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleCriarProgramacaoCulto = async (e) => {
+    e.preventDefault();
+    if (!pregadorNome || !pregadorData) {
+      alert("Por favor, informe o nome do pregador(a) e a data do culto.");
+      return;
+    }
+    setSavingPregador(true);
+    try {
+      await criarProgramacaoCulto({
+        dataCulto: pregadorData,
+        turno: pregadorTurno,
+        pregadorNome: pregadorNome,
+        temaCulto: pregadorTema,
+        observacoes: pregadorObs
+      });
+      alert("Pregador(a) agendado(a) com sucesso!");
+      setPregadorNome('');
+      setPregadorTema('');
+      setPregadorData('');
+      setPregadorObs('');
+    } catch (err) {
+      alert("Erro ao agendar pregador: " + err.message);
+    } finally {
+      setSavingPregador(false);
+    }
+  };
+
+  const handleDeletarProgramacaoCulto = async (id) => {
+    if (!window.confirm("Deseja remover este pregador da programação?")) return;
+    try {
+      await deletarProgramacaoCulto(id);
+    } catch (err) {
+      alert("Erro ao remover pregador: " + err.message);
+    }
+  };
+
 
   const handleDeletarEscala = async (escalaId) => {
     if (!window.confirm("Deseja remover este voluntário da escala?")) return;
@@ -744,6 +801,134 @@ export default function AdminDashboard({ user }) {
                 ))}
               </div>
             )}
+          </div>
+
+          {/* Seção de Pregadores / Convidados (Sem necessidade de cadastro) */}
+          <div style={{ background: 'var(--bg-card)', border: '1px solid rgba(245, 158, 11, 0.4)', borderRadius: '14px', padding: '1.25rem' }}>
+            <h3 className="heading-font" style={{ margin: '0 0 0.4rem 0', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#fbbf24' }}>
+              <Mic size={18} />
+              <span>Agendar Pregador(a) ou Convidado Especial (Sem necessidade de cadastro)</span>
+            </h3>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0 0 1rem 0' }}>
+              Cadastre quem vai ministrar ou pregar no culto das crianças. Esta informação aparecerá automaticamente no aplicativo dos pais/responsáveis!
+            </p>
+
+            <form onSubmit={handleCriarProgramacaoCulto} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div className="grid-2-col">
+                <div className="form-group">
+                  <label className="form-label">Nome do Pregador(a) ou Convidado *</label>
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    placeholder="Ex: Pr. João Silva, Tia Sarah, Pr. Marcos..."
+                    value={pregadorNome} 
+                    onChange={(e) => setPregadorNome(e.target.value)} 
+                    required 
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Tema da Pregação / Lição</label>
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    placeholder="Ex: O Fruto do Espírito, A Arca de Noé..."
+                    value={pregadorTema} 
+                    onChange={(e) => setPregadorTema(e.target.value)} 
+                  />
+                </div>
+              </div>
+
+              <div className="grid-2-col">
+                <div className="form-group">
+                  <label className="form-label">Data do Culto *</label>
+                  <input 
+                    type="date" 
+                    className="form-input" 
+                    value={pregadorData} 
+                    onChange={(e) => setPregadorData(e.target.value)} 
+                    required 
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Turno do Culto</label>
+                  <select 
+                    className="form-input" 
+                    value={pregadorTurno} 
+                    onChange={(e) => setPregadorTurno(e.target.value)}
+                  >
+                    <option value="Manhã">Manhã</option>
+                    <option value="Noite">Noite</option>
+                    <option value="Tarde">Tarde</option>
+                    <option value="Especial">Culto Especial</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Observações / Versículo Base (Exibido para os pais)</label>
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  placeholder="Ex: Texto base: Mateus 19:14. Traga sua Bíblia!"
+                  value={pregadorObs} 
+                  onChange={(e) => setPregadorObs(e.target.value)} 
+                />
+              </div>
+
+              <button 
+                type="submit" 
+                className="btn" 
+                disabled={savingPregador}
+                style={{ width: '100%', marginTop: '0.25rem', padding: '0.75rem', justifyContent: 'center', background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', color: '#fff', fontWeight: 700 }}
+              >
+                {savingPregador ? 'Agendando Pregador...' : '🎤 Confirmar Agendamento de Pregador'}
+              </button>
+            </form>
+
+            {/* Lista de Pregadores Agendados */}
+            <div style={{ marginTop: '1.25rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
+              <h4 style={{ fontSize: '0.9rem', color: '#fff', margin: '0 0 0.75rem 0', fontWeight: 700 }}>
+                Pregadores & Ministrantes Agendados ({programacaoCultos.length})
+              </h4>
+
+              {programacaoCultos.length === 0 ? (
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontStyle: 'italic', margin: 0 }}>
+                  Nenhum pregador agendado ainda. Preencha o formulário acima para cadastrar!
+                </p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  {programacaoCultos.map(item => (
+                    <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '0.75rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <strong style={{ color: '#fbbf24', fontSize: '0.9rem' }}>🎤 {item.pregador_nome}</strong>
+                          <span style={{ fontSize: '0.7rem', background: 'rgba(245,158,11,0.2)', color: '#fbbf24', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>
+                            Turno da {item.turno}
+                          </span>
+                        </div>
+                        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'block', marginTop: '0.2rem' }}>
+                          Data: <strong>{new Date(item.data_culto + 'T00:00:00').toLocaleDateString('pt-BR')}</strong> {item.tema_culto && `• Tema: "${item.tema_culto}"`}
+                        </span>
+                        {item.observacoes && (
+                          <span style={{ fontSize: '0.73rem', color: 'var(--text-secondary)', fontStyle: 'italic', display: 'block' }}>
+                            Nota: {item.observacoes}
+                          </span>
+                        )}
+                      </div>
+                      <button 
+                        onClick={() => handleDeletarProgramacaoCulto(item.id)}
+                        className="btn"
+                        style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}
+                      >
+                        <Trash2 size={13} style={{ marginRight: '0.2rem' }} /> Remover
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       ) : activeTab === 'mural' ? (

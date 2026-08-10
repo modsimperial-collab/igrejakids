@@ -151,6 +151,21 @@ CREATE TABLE IF NOT EXISTS public.chamadas_emergencia (
 ALTER TABLE public.chamadas_emergencia ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Permitir acesso completo a chamadas para autenticados" ON public.chamadas_emergencia FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
+-- 6.11. TABELA DE PROGRAMAÇÃO DE CULTOS E PREGADORES (SEM NECESSIDADE DE CADASTRO)
+CREATE TABLE IF NOT EXISTS public.programacao_cultos (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  data_culto DATE NOT NULL,
+  turno TEXT NOT NULL DEFAULT 'Manhã',
+  pregador_nome TEXT NOT NULL,
+  tema_culto TEXT,
+  observacoes TEXT,
+  foto_pregador TEXT,
+  data_cadastro TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+ALTER TABLE public.programacao_cultos ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Permitir leitura da programacao para autenticados" ON public.programacao_cultos FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Permitir acesso completo a programacao para autenticados" ON public.programacao_cultos FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
 -- 7. HABILITAR REPLICAÇÃO EM TEMPO REAL (REALTIME) SEGURO
 DO $$
 BEGIN
@@ -180,6 +195,9 @@ BEGIN
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'chamadas_emergencia') THEN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.chamadas_emergencia;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'programacao_cultos') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.programacao_cultos;
   END IF;
 END $$;
 
@@ -264,4 +282,20 @@ CREATE OR REPLACE TRIGGER on_auth_user_created
 -- SCRIPT DE ATUALIZAÇÃO PARA BANCOS JÁ EXISTENTES:
 -- ALTER TABLE public.usuarios ADD COLUMN IF NOT EXISTS antecedentes_criminais TEXT;
 -- ALTER TABLE public.filhos ADD COLUMN IF NOT EXISTS alergias TEXT;
+-- 
+-- CREATE TABLE IF NOT EXISTS public.programacao_cultos (
+--   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+--   data_culto DATE NOT NULL,
+--   turno TEXT NOT NULL DEFAULT 'Manhã',
+--   pregador_nome TEXT NOT NULL,
+--   tema_culto TEXT,
+--   observacoes TEXT,
+--   foto_pregador TEXT,
+--   data_cadastro TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+-- );
+-- ALTER TABLE public.programacao_cultos ENABLE ROW LEVEL SECURITY;
+-- CREATE POLICY "Permitir leitura da programacao para autenticados" ON public.programacao_cultos FOR SELECT TO authenticated USING (true);
+-- CREATE POLICY "Permitir acesso completo a programacao para autenticados" ON public.programacao_cultos FOR ALL TO authenticated USING (true) WITH CHECK (true);
+-- ALTER PUBLICATION supabase_realtime ADD TABLE public.programacao_cultos;
+
 

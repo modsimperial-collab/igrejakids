@@ -480,7 +480,7 @@ export const subscribeToDailyAttendance = (callback) => {
               id: cleanFilhoId || rec.filho_id, 
               nome: childNameFallback, 
               responsavel_id: rId, 
-              selfie: rObj?.selfie || null,
+              selfie: null, // Removido o fallback para a selfie do pai (rObj?.selfie)
               neurodivergente: false,
               neurodivergencia_detalhe: null,
               como_acalmar: null,
@@ -886,3 +886,64 @@ export const cadastrarFilhoExpressVisitante = async ({ nome, dataNascimento, res
 
   return novoFilho[0];
 };
+
+/**
+ * 5. Gestão de Programação de Cultos e Pregadores (Convidados sem necessidade de cadastro)
+ */
+export const getProgramacaoCultos = async () => {
+  const { data, error } = await supabase
+    .from('programacao_cultos')
+    .select('*')
+    .order('data_culto', { ascending: true });
+
+  if (error) throw new Error(error.message);
+  return data || [];
+};
+
+export const subscribeToProgramacaoCultos = (callback) => {
+  // Buscar incial
+  getProgramacaoCultos().then(callback).catch(err => console.error(err));
+
+  const channel = supabase
+    .channel('realtime_programacao_cultos')
+    .on('postgres_changes', { 
+      event: '*', 
+      schema: 'public', 
+      table: 'programacao_cultos' 
+    }, () => {
+      getProgramacaoCultos().then(callback).catch(err => console.error(err));
+    })
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+};
+
+export const criarProgramacaoCulto = async ({ dataCulto, turno, pregadorNome, temaCulto, observacoes, fotoPregador }) => {
+  const { data, error } = await supabase
+    .from('programacao_cultos')
+    .insert([{
+      data_culto: dataCulto,
+      turno: turno || 'Manhã',
+      pregador_nome: pregadorNome,
+      tema_culto: temaCulto || '',
+      observacoes: observacoes || '',
+      foto_pregador: fotoPregador || null
+    }])
+    .select();
+
+  if (error) throw new Error(error.message);
+  return data[0];
+};
+
+export const deletarProgramacaoCulto = async (id) => {
+  const { error } = await supabase
+    .from('programacao_cultos')
+    .delete()
+    .eq('id', id);
+
+  if (error) throw new Error(error.message);
+  return true;
+};
+

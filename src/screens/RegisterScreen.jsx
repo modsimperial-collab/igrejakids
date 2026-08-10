@@ -174,7 +174,8 @@ export default function RegisterScreen({ onNavigateToLogin }) {
   return (
     <div className="auth-card" style={{ maxWidth: tipoUsuario === 'responsavel' ? '650px' : '450px', transition: 'max-width 0.3s ease' }}>
       <div className="auth-header">
-        <h1 className="auth-title heading-font" style={{ fontSize: '1.8rem' }}>Criar Conta</h1>
+        <img src="/logo.svg" alt="Igreja da Criança AD Madureira Logo" />
+        <h1 className="auth-title heading-font" style={{ fontSize: '1.8rem', marginTop: '0.5rem' }}>Criar Conta</h1>
         <p className="auth-subtitle">Cadastre-se no fluxo da Igreja da Criança AD Madureira</p>
       </div>
 

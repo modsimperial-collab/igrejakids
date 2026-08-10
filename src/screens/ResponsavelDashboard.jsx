@@ -8,7 +8,8 @@ import {
   supabase, 
   subscribeToChamadasEmergenciaResponsavel, 
   atenderChamadaEmergencia, 
-  getDiarioBordoByFilho 
+  getDiarioBordoByFilho,
+  subscribeToProgramacaoCultos
 } from '../services/supabase';
 import { 
   Plus, 
@@ -29,7 +30,8 @@ import {
   Bell,
   Check,
   BookOpen,
-  Edit3
+  Edit3,
+  Mic
 } from 'lucide-react';
 import SocialWall from '../components/SocialWall';
 import SelfieCapture from '../components/SelfieCapture';
@@ -76,6 +78,15 @@ export default function ResponsavelDashboard({ user }) {
   const [authSelfie, setAuthSelfie] = useState('');
   const [savingAuth, setSavingAuth] = useState(false);
   const [showEditProfile, setShowEditProfile] = useState(false);
+  const [programacaoCultos, setProgramacaoCultos] = useState([]);
+
+  // Escutar programação do culto (quem vai pregar) em tempo real
+  useEffect(() => {
+    const unsubscribe = subscribeToProgramacaoCultos((list) => {
+      setProgramacaoCultos(list);
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Escutar chamadas de emergência em tempo real para este responsável
   useEffect(() => {
@@ -424,6 +435,93 @@ export default function ResponsavelDashboard({ user }) {
           <User size={14} />
           <span>Editar Perfil</span>
         </button>
+      </div>
+
+      {/* CARD DE PROGRAMAÇÃO DO CULTO (QUEM VAI PREGAR) */}
+      <div style={{
+        background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.95) 100%)',
+        border: '1px solid rgba(245, 158, 11, 0.4)',
+        borderRadius: '16px',
+        padding: '1rem 1.25rem',
+        marginTop: '0.85rem',
+        marginBottom: '1rem',
+        boxShadow: '0 8px 20px rgba(0, 0, 0, 0.25)',
+        position: 'relative',
+        overflow: 'hidden'
+      }}>
+        <div style={{
+          position: 'absolute',
+          top: '-20px',
+          right: '-20px',
+          width: '90px',
+          height: '90px',
+          background: 'radial-gradient(circle, rgba(245, 158, 11, 0.15) 0%, transparent 70%)',
+          borderRadius: '50%'
+        }} />
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.6rem' }}>
+          <div style={{
+            width: '34px',
+            height: '34px',
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#fff',
+            boxShadow: '0 4px 10px rgba(245, 158, 11, 0.4)'
+          }}>
+            <BookOpen size={18} />
+          </div>
+          <div>
+            <h3 className="heading-font" style={{ margin: 0, fontSize: '0.95rem', color: '#fbbf24', letterSpacing: '0.5px' }}>
+              PROGRAMAÇÃO DO PRÓXIMO CULTO
+            </h3>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+              Saiba o que seu filho(a) vai aprender na igreja!
+            </span>
+          </div>
+        </div>
+
+        {programacaoCultos.length > 0 ? (
+          (() => {
+            const proximo = programacaoCultos[0];
+            const dataFormatada = new Date(proximo.data_culto + 'T00:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' });
+            return (
+              <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.06)', borderRadius: '12px', padding: '0.85rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#60a5fa', textTransform: 'capitalize' }}>
+                    📅 {dataFormatada} • Turno da {proximo.turno}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                  <div style={{ fontSize: '1rem', fontWeight: 800, color: '#fff', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span>🎤 Pregador(a):</span>
+                    <span style={{ color: '#fbbf24' }}>{proximo.pregador_nome}</span>
+                  </div>
+
+                  {proximo.tema_culto && (
+                    <div style={{ fontSize: '0.88rem', color: '#e2e8f0', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <span>📖 Tema:</span>
+                      <strong>"{proximo.tema_culto}"</strong>
+                    </div>
+                  )}
+
+                  {proximo.observacoes && (
+                    <p style={{ margin: '0.3rem 0 0 0', fontSize: '0.78rem', color: 'var(--text-secondary)', fontStyle: 'italic', background: 'rgba(0,0,0,0.2)', padding: '0.4rem 0.6rem', borderRadius: '6px' }}>
+                      💡 {proximo.observacoes}
+                    </p>
+                  )}
+                </div>
+              </div>
+            );
+          })()
+        ) : (
+          <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '0.75rem', borderRadius: '10px', fontSize: '0.8rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+            Nenhum pregador cadastrado para o próximo culto ainda. Em breve a programação estará disponível aqui!
+          </div>
+        )}
       </div>
 
       {/* Tabs Selector */}

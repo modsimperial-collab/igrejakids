@@ -54,7 +54,8 @@ PASSO 1: PRIMEIRO ACESSO E CADASTRO
   2. Clique em "Criar Conta" e selecione o perfil "Voluntário".
   3. Preencha seus dados: Nome, E-mail, Senha, Telefone e Ministério de Origem.
   4. Anexe a Certidão de Antecedentes Criminais (obrigatório para a segurança das crianças).
-  5. Aguarde a aprovação da sua conta pela liderança (Administrador).
+  5. ATENÇÃO (IMPORTANTE): Acesse a caixa de entrada do e-mail que você cadastrou e clique no link de confirmação para validar e finalizar o seu cadastro! (Olhe a caixa de spam se não encontrar).
+  6. Após confirmar o e-mail, aguarde a aprovação final da sua conta pela liderança (Administrador).
 
 PASSO 2: CONSULTA DA ESCALA E TROCA DE CULTO
   1. No painel do voluntário, acesse a aba "Escala".
