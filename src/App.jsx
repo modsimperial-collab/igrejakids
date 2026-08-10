@@ -39,17 +39,31 @@ export default function App() {
   }
 
   // Se o usuário está logado mas os dados do perfil público no Supabase ainda não carregaram ou o documento não existe
-  if (!user) {
+  if (!user || user._error) {
     return (
       <div className="app-container">
         <div className="blocked-card">
-          <h2 className="blocked-title heading-font">Criando Perfil...</h2>
+          <h2 className="blocked-title heading-font">
+            {user?._error ? 'Erro ao Carregar Perfil' : 'Carregando Perfil...'}
+          </h2>
           <p className="blocked-text">
-            Seu registro está sendo configurado. Se o problema persistir, saia e entre novamente.
+            {user?._error ? (
+              <span style={{ color: '#fda4af' }}>
+                Ocorreu um erro no banco de dados: <br/><strong>{user._error}</strong><br/>
+                Por favor, verifique se rodou o script schema.sql ou as permissões de acesso (RLS).
+              </span>
+            ) : (
+              'Seu registro está sendo configurado ou sincronizado com o banco de dados. Isso deve levar apenas alguns segundos.'
+            )}
           </p>
-          <button className="btn btn-secondary" onClick={signOut}>
-            Sair da Conta
-          </button>
+          <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
+            <button className="btn btn-primary" onClick={() => window.location.reload()}>
+              Recarregar Página
+            </button>
+            <button className="btn btn-secondary" onClick={signOut}>
+              Sair da Conta
+            </button>
+          </div>
         </div>
       </div>
     );

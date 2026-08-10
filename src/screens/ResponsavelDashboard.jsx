@@ -420,7 +420,7 @@ export default function ResponsavelDashboard({ user }) {
             </div>
           )}
           <div className="vol-info">
-            <span className="vol-name">Família {user?.nome?.split(' ')[0] || 'Responsável'}</span>
+            <span className="vol-name">Família {user?.nome ? user.nome.split(' ').pop() : 'Responsável'}</span>
             <span className="vol-badge" style={{ color: '#ec4899' }}>
               <Heart size={12} fill="#ec4899" />
               Responsável Ativo

@@ -27,8 +27,11 @@ export const AuthProvider = ({ children }) => {
         .eq('uid', uid)
         .maybeSingle();
 
+      let errorMessage = '';
+
       if (error) {
         console.error("Erro ao buscar perfil:", error);
+        errorMessage = error.message;
       }
 
       // Se o perfil não existir na tabela 'usuarios', criamos automaticamente usando os metadados completos
@@ -55,7 +58,6 @@ export const AuthProvider = ({ children }) => {
         } else if (tipoUsuario === 'voluntario') {
           newProfileObj.ministerio = metadata.ministerio || '';
           newProfileObj.antecedentes_criminais = metadata.antecedentes_criminais || null;
-          newProfileObj.termo_aceito = !!metadata.voluntario_termo_aceito;
         }
 
         const { data: newProfile, error: insertError } = await supabase
@@ -66,6 +68,7 @@ export const AuthProvider = ({ children }) => {
 
         if (insertError) {
           console.error("Erro ao auto-criar perfil público de usuário:", insertError);
+          errorMessage = `INSERT ERROR: ${JSON.stringify(insertError)}`;
         } else {
           data = newProfile;
 
@@ -117,6 +120,9 @@ export const AuthProvider = ({ children }) => {
       }
 
       setUser(data || null);
+      if (errorMessage) {
+        setUser({ _error: errorMessage }); // Armazenar erro no user temporariamente para UI
+      }
       setLoading(false);
 
       // Escutar atualizações do perfil do usuário em tempo real
@@ -248,7 +254,6 @@ export const AuthProvider = ({ children }) => {
             userPayload.ministerio = extraData.ministerio || '';
             userPayload.selfie = extraData.selfie || null;
             userPayload.antecedentes_criminais = extraData.antecedentesCriminais || null;
-            userPayload.termo_aceito = !!extraData.voluntarioTermoAceito;
           }
 
           const { error: dbError } = await supabase

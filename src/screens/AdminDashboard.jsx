@@ -599,7 +599,9 @@ export default function AdminDashboard({ user }) {
                     required
                   >
                     <option value="">-- Selecione um Voluntário Ativo --</option>
-                    {activeVolunteers.map(vol => (
+                    {activeVolunteers
+                      .filter(vol => vol.tipo_usuario === 'voluntario' || vol.tipo_usuario === 'admin')
+                      .map(vol => (
                       <option key={vol.uid} value={vol.uid}>
                         {vol.nome} ({vol.ministerio || 'Voluntário'})
                       </option>
@@ -767,7 +769,7 @@ export default function AdminDashboard({ user }) {
                         >
                           <option value="">-- Selecione um Voluntário --</option>
                           {activeVolunteers
-                            .filter(v => v.uid !== item.voluntario?.uid)
+                            .filter(v => v.uid !== item.voluntario?.uid && (v.tipo_usuario === 'voluntario' || v.tipo_usuario === 'admin'))
                             .map(vol => (
                               <option key={vol.uid} value={vol.uid}>
                                 {vol.nome} ({vol.ministerio || 'Voluntário'})
