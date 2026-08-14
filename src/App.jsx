@@ -49,8 +49,10 @@ export default function App() {
           <p className="blocked-text">
             {user?._error ? (
               <span style={{ color: '#fda4af' }}>
-                Ocorreu um erro no banco de dados: <br/><strong>{user._error}</strong><br/>
-                Por favor, verifique se rodou o script schema.sql ou as permissões de acesso (RLS).
+                Ocorreu um erro ao carregar os dados: <br/><strong>{user._error}</strong><br/>
+                {user._error.includes('Failed to fetch') 
+                  ? 'Isso geralmente indica um problema de conexão. Verifique sua internet, se o Supabase está online ou se algum AdBlocker está bloqueando a requisição.'
+                  : 'Por favor, verifique se rodou o script schema.sql ou as permissões de acesso (RLS) no Supabase.'}
               </span>
             ) : (
               'Seu registro está sendo configurado ou sincronizado com o banco de dados. Isso deve levar apenas alguns segundos.'

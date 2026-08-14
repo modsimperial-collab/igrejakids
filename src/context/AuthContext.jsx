@@ -34,8 +34,25 @@ export const AuthProvider = ({ children }) => {
         errorMessage = error.message;
       }
 
-      // Se o perfil não existir na tabela 'usuarios', criamos automaticamente usando os metadados completos
+      // Se o perfil não existir e não for um erro de rede, pode ser um delay da trigger do banco.
+      // Vamos aguardar 1 segundo e tentar novamente antes de tentar o insert manual.
       if (!data && !error && currentSession?.user) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        const { data: retryData, error: retryError } = await supabase
+          .from('usuarios')
+          .select('*')
+          .eq('uid', uid)
+          .maybeSingle();
+        
+        if (retryData) {
+          data = retryData;
+        } else if (retryError) {
+          errorMessage = retryError.message;
+        }
+      }
+
+      // Se ainda não existir na tabela 'usuarios', tentamos criar automaticamente como fallback
+      if (!data && !errorMessage && currentSession?.user) {
         const metadata = currentSession.user.user_metadata || {};
         const nome = metadata.nome || 'Usuário';
         const tipoUsuario = metadata.tipo_usuario || 'voluntario';
@@ -68,7 +85,13 @@ export const AuthProvider = ({ children }) => {
 
         if (insertError) {
           console.error("Erro ao auto-criar perfil público de usuário:", insertError);
-          errorMessage = `INSERT ERROR: ${JSON.stringify(insertError)}`;
+          // Se falhou o insert (possivelmente por RLS ou unique constraint), vamos tentar buscar mais uma vez
+          const { data: finalCheck } = await supabase.from('usuarios').select('*').eq('uid', uid).maybeSingle();
+          if (finalCheck) {
+            data = finalCheck;
+          } else {
+            errorMessage = `Falha ao criar perfil: ${insertError.message || insertError.code}. Verifique as permissões do banco.`;
+          }
         } else {
           data = newProfile;
 
