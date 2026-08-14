@@ -45,10 +45,44 @@ export default function DocumentUpload({
     const reader = new FileReader();
     reader.onload = (event) => {
       const result = event.target.result;
-      setDocumentData(result);
-      setFileName(file.name);
-      setFileType(isPdf ? 'pdf' : 'image');
-      onUpload(result);
+      
+      if (isImage) {
+        // Redimensionar e compactar imagem para no máximo 800px mantendo proporção
+        const img = new Image();
+        img.onload = () => {
+          const canvas = canvasRef.current || document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          const maxDim = 800;
+
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
+          setDocumentData(compressedBase64);
+          setFileName(file.name);
+          setFileType('image');
+          onUpload(compressedBase64);
+        };
+        img.src = result;
+      } else {
+        setDocumentData(result);
+        setFileName(file.name);
+        setFileType('pdf');
+        onUpload(result);
+      }
     };
 
     reader.onerror = () => {
@@ -101,12 +135,26 @@ export default function DocumentUpload({
       const canvas = canvasRef.current;
       const ctx = canvas.getContext('2d');
 
-      canvas.width = video.videoWidth || 800;
-      canvas.height = video.videoHeight || 600;
+      let width = video.videoWidth || 800;
+      let height = video.videoHeight || 600;
+      const maxDim = 800;
 
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      if (width > maxDim || height > maxDim) {
+        if (width > height) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        } else {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+      }
 
-      const base64Image = canvas.toDataURL('image/jpeg', 0.8);
+      canvas.width = width;
+      canvas.height = height;
+
+      ctx.drawImage(video, 0, 0, width, height);
+
+      const base64Image = canvas.toDataURL('image/jpeg', 0.6);
       setDocumentData(base64Image);
       setFileName('Foto_Antecedentes.jpg');
       setFileType('image');

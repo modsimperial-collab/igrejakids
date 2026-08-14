@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { supabase } from '../services/supabase';
 
 const AuthContext = createContext({});
@@ -7,52 +7,53 @@ export const AuthProvider = ({ children }) => {
   const [session, setSession] = useState(null);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  
+  const activeChannelRef = useRef(null);
+  const isFetchingRef = useRef(false);
 
   useEffect(() => {
-    let activeChannel = null;
-
     const fetchAndSubscribeProfile = async (uid, email, currentSession) => {
+      // Se já está buscando o perfil deste usuário, evita requisições simultâneas em paralelo
+      if (isFetchingRef.current) return;
+      isFetchingRef.current = true;
       setLoading(true);
 
-      // Limpar canal anterior se houver
-      if (activeChannel) {
-        supabase.removeChannel(activeChannel);
-        activeChannel = null;
+      // Limpar canal de realtime anterior se houver
+      if (activeChannelRef.current) {
+        supabase.removeChannel(activeChannelRef.current);
+        activeChannelRef.current = null;
       }
 
-      // Buscar perfil na tabela pública
-      let { data, error } = await supabase
-        .from('usuarios')
-        .select('*')
-        .eq('uid', uid)
-        .maybeSingle();
-
+      let profileData = null;
       let errorMessage = '';
 
-      if (error) {
-        console.error("Erro ao buscar perfil:", error);
-        errorMessage = error.message;
-      }
-
-      // Se o perfil não existir e não for um erro de rede, pode ser um delay da trigger do banco.
-      // Vamos aguardar 1 segundo e tentar novamente antes de tentar o insert manual.
-      if (!data && !error && currentSession?.user) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        const { data: retryData, error: retryError } = await supabase
+      // Tentar buscar perfil na tabela pública (com até 3 retentativas para dar tempo da trigger do banco rodar)
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const { data, error } = await supabase
           .from('usuarios')
           .select('*')
           .eq('uid', uid)
           .maybeSingle();
-        
-        if (retryData) {
-          data = retryData;
-        } else if (retryError) {
-          errorMessage = retryError.message;
+
+        if (error) {
+          console.error(`Erro ao buscar perfil (tentativa ${attempt + 1}):`, error);
+          errorMessage = error.message;
+          break;
+        }
+
+        if (data) {
+          profileData = data;
+          break;
+        }
+
+        // Aguarda 500ms antes da próxima tentativa
+        if (attempt < 2) {
+          await new Promise(resolve => setTimeout(resolve, 500));
         }
       }
 
-      // Se ainda não existir na tabela 'usuarios', tentamos criar automaticamente como fallback
-      if (!data && !errorMessage && currentSession?.user) {
+      // Se após as retentativas o perfil não existir e não houver erro de rede, executa o fallback com UPSERT
+      if (!profileData && !errorMessage && currentSession?.user) {
         const metadata = currentSession.user.user_metadata || {};
         const nome = metadata.nome || 'Usuário';
         const tipoUsuario = metadata.tipo_usuario || 'voluntario';
@@ -63,7 +64,6 @@ export const AuthProvider = ({ children }) => {
           email: email,
           tipo_usuario: tipoUsuario,
           aprovado: tipoUsuario === 'admin' ? true : false,
-          selfie: metadata.selfie || null,
           data_cadastro: new Date().toISOString()
         };
 
@@ -74,132 +74,74 @@ export const AuthProvider = ({ children }) => {
           newProfileObj.nome_igreja = metadata.nome_igreja || '';
         } else if (tipoUsuario === 'voluntario') {
           newProfileObj.ministerio = metadata.ministerio || '';
-          newProfileObj.antecedentes_criminais = metadata.antecedentes_criminais || null;
         }
 
-        const { data: newProfile, error: insertError } = await supabase
+        // Usa upsert em vez de insert para evitar conflitos de chave primária
+        const { data: newProfile, error: upsertError } = await supabase
           .from('usuarios')
-          .insert([newProfileObj])
+          .upsert([newProfileObj])
           .select()
           .maybeSingle();
 
-        if (insertError) {
-          console.error("Erro ao auto-criar perfil público de usuário:", insertError);
-          // Se falhou o insert (possivelmente por RLS ou unique constraint), vamos tentar buscar mais uma vez
-          const { data: finalCheck } = await supabase.from('usuarios').select('*').eq('uid', uid).maybeSingle();
-          if (finalCheck) {
-            data = finalCheck;
-          } else {
-            errorMessage = `Falha ao criar perfil: ${insertError.message || insertError.code}. Verifique as permissões do banco.`;
-          }
+        if (upsertError) {
+          console.error("Erro ao auto-criar perfil público de usuário via fallback:", upsertError);
+          errorMessage = `Falha ao carregar perfil: ${upsertError.message}`;
         } else {
-          data = newProfile;
-
-          // Se for responsável e tiver dados do filho nos metadados, criar o filho também no fallback
-          if (tipoUsuario === 'responsavel' && metadata.child_name) {
-            // Verificar se o filho já existe
-            const { data: existingKids } = await supabase
-              .from('filhos')
-              .select('id')
-              .eq('responsavel_id', uid)
-              .eq('nome', metadata.child_name);
-
-            if (!existingKids || existingKids.length === 0) {
-              let calculatedAge = 0;
-              if (metadata.child_birthdate) {
-                const birth = new Date(metadata.child_birthdate);
-                const today = new Date();
-                calculatedAge = today.getFullYear() - birth.getFullYear();
-                const m = today.getMonth() - birth.getMonth();
-                if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
-                  calculatedAge--;
-                }
-              }
-
-              const { error: childError } = await supabase
-                .from('filhos')
-                .insert([
-                  {
-                    responsavel_id: uid,
-                    nome: metadata.child_name,
-                    idade: calculatedAge,
-                    data_nascimento: metadata.child_birthdate || null,
-                    apelido: metadata.child_nickname || '',
-                    neurodivergente: !!metadata.child_neurodivergente,
-                    neurodivergencia_detalhe: metadata.child_neurodivergencia_detalhe || '',
-                    como_acalmar: metadata.child_como_acalmar || '',
-                    termo_aceito: !!metadata.child_termo_aceito,
-                    selfie: metadata.child_selfie || null,
-                    data_cadastro: new Date().toISOString()
-                  }
-                ]);
-
-              if (childError) {
-                console.error("Erro ao cadastrar filho no fallback de login:", childError.message);
-              }
-            }
-          }
+          profileData = newProfile;
         }
       }
 
-      setUser(data || null);
+      setUser(profileData || null);
       if (errorMessage) {
-        setUser({ _error: errorMessage }); // Armazenar erro no user temporariamente para UI
+        setUser({ _error: errorMessage });
       }
       setLoading(false);
+      isFetchingRef.current = false;
 
-      // Escutar atualizações do perfil do usuário em tempo real
-      activeChannel = supabase
-        .channel(`user-profile-channel-${uid}`)
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'usuarios',
-            filter: `uid=eq.${uid}`
-          },
-          (payload) => {
-            if (payload.eventType === 'DELETE') {
-              setUser(null);
-            } else {
-              setUser(payload.new);
+      // Escutar atualizações do perfil em tempo real
+      if (uid) {
+        activeChannelRef.current = supabase
+          .channel(`user-profile-channel-${uid}`)
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'usuarios',
+              filter: `uid=eq.${uid}`
+            },
+            (payload) => {
+              if (payload.eventType === 'DELETE') {
+                setUser(null);
+              } else {
+                setUser(payload.new);
+              }
             }
-          }
-        )
-        .subscribe();
+          )
+          .subscribe();
+      }
     };
 
-    // 1. Obter sessão atual
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-      setSession(currentSession);
-      if (currentSession?.user) {
-        fetchAndSubscribeProfile(currentSession.user.id, currentSession.user.email, currentSession);
-      } else {
-        setUser(null);
-        setLoading(false);
-      }
-    });
-
-    // 2. Escutar mudanças no estado de autenticação
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    // Escutar mudanças no estado de autenticação (única fonte de verdade para mudanças de sessão)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
       setSession(newSession);
       if (newSession?.user) {
         fetchAndSubscribeProfile(newSession.user.id, newSession.user.email, newSession);
       } else {
         setUser(null);
         setLoading(false);
-        if (activeChannel) {
-          supabase.removeChannel(activeChannel);
-          activeChannel = null;
+        isFetchingRef.current = false;
+        if (activeChannelRef.current) {
+          supabase.removeChannel(activeChannelRef.current);
+          activeChannelRef.current = null;
         }
       }
     });
 
     return () => {
       subscription.unsubscribe();
-      if (activeChannel) {
-        supabase.removeChannel(activeChannel);
+      if (activeChannelRef.current) {
+        supabase.removeChannel(activeChannelRef.current);
       }
     };
   }, []);
@@ -214,7 +156,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   const signUp = async (email, password, nome, tipoUsuario, extraData = {}) => {
-    // 1. Criar usuário na Auth do Supabase (passando metadados completos para o trigger seguro do banco)
+    // 1. Criar usuário na Auth do Supabase enviando APENAS metadados leves de texto.
+    // Evitamos enviar arquivos/Base64 grandes dentro do user_metadata do Auth para não estourar o limite de payload (400 Bad Request / 520).
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -226,12 +169,10 @@ export const AuthProvider = ({ children }) => {
           endereco: extraData.endereco || '',
           membro_igreja: !!extraData.membroIgreja,
           nome_igreja: extraData.membroIgreja ? (extraData.nomeIgreja || '') : '',
-          selfie: extraData.selfie || null,
           ministerio: extraData.ministerio || '',
-          antecedentes_criminais: extraData.antecedentesCriminais || null,
           voluntario_termo_aceito: !!extraData.voluntarioTermoAceito,
           
-          // Dados do Filho
+          // Dados leves do Filho
           child_name: extraData.childName || '',
           child_birthdate: extraData.childBirthdate || '',
           child_nickname: extraData.childNickname || '',
@@ -239,100 +180,51 @@ export const AuthProvider = ({ children }) => {
           child_neurodivergencia_detalhe: extraData.neurodivergente ? (extraData.neurodivergenciaDetalhe || '') : '',
           child_como_acalmar: extraData.comoAcalmar || '',
           child_alergias: extraData.alergias || '',
-          child_termo_aceito: !!extraData.termoAceito,
-          child_selfie: extraData.childSelfie || null
+          child_termo_aceito: !!extraData.termoAceito
         }
       }
     });
 
     if (error) throw translateSupabaseError(error);
 
-    // 2. Tentar inserir via API cliente (será redundante se o trigger já rodou, mas serve de fallback imediato)
+    // 2. Se o cadastro no Auth tiver sido criado com sucesso, salvamos a Selfie e a Certidão de Antecedentes Criminais
+    // diretamente na tabela pública `public.usuarios` e `public.filhos` (que suportam colunas de texto grandes sem limite).
     if (data?.user) {
+      const uid = data.user.id;
+
       try {
-        // Verificar se o usuário já existe na tabela pública (se o trigger já o criou)
-        const { data: existingUser } = await supabase
-          .from('usuarios')
-          .select('uid')
-          .eq('uid', data.user.id)
-          .maybeSingle();
+        // Aguarda um pequeno instante para a trigger do banco criar a linha base
+        await new Promise(resolve => setTimeout(resolve, 300));
 
-        if (!existingUser) {
-          const userPayload = {
-            uid: data.user.id,
-            nome,
-            email,
-            tipo_usuario: tipoUsuario,
-            aprovado: false,
-            data_cadastro: new Date().toISOString()
-          };
+        // Atualizar foto de selfie e antecedentes criminais do usuário na tabela usuarios
+        const userUpdates = {};
+        if (extraData.selfie) userUpdates.selfie = extraData.selfie;
+        if (extraData.antecedentesCriminais) userUpdates.antecedentes_criminais = extraData.antecedentesCriminais;
 
-          if (tipoUsuario === 'responsavel') {
-            userPayload.telefone = extraData.telefone || '';
-            userPayload.endereco = extraData.endereco || '';
-            userPayload.membro_igreja = !!extraData.membroIgreja;
-            userPayload.selfie = extraData.selfie || null;
-            userPayload.nome_igreja = extraData.nomeIgreja || '';
-          } else if (tipoUsuario === 'voluntario') {
-            userPayload.ministerio = extraData.ministerio || '';
-            userPayload.selfie = extraData.selfie || null;
-            userPayload.antecedentes_criminais = extraData.antecedentesCriminais || null;
-          }
-
-          const { error: dbError } = await supabase
+        if (Object.keys(userUpdates).length > 0) {
+          const { error: updateError } = await supabase
             .from('usuarios')
-            .insert([userPayload]);
-          
-          if (dbError) {
-            console.error("Erro ao criar perfil público no signup:", dbError.message);
+            .update(userUpdates)
+            .eq('uid', uid);
+
+          if (updateError) {
+            console.error("Erro ao salvar arquivos do perfil em usuarios:", updateError.message);
           }
         }
 
-        // 3. Se for responsável e tiver dados do filho, verificar se o filho já existe
-        if (tipoUsuario === 'responsavel' && extraData.childName) {
-          const { data: existingChildren } = await supabase
+        // Se for responsável e tiver selfie da criança, atualiza na tabela de filhos
+        if (tipoUsuario === 'responsavel' && extraData.childSelfie) {
+          const { error: childSelfieErr } = await supabase
             .from('filhos')
-            .select('id')
-            .eq('responsavel_id', data.user.id)
-            .eq('nome', extraData.childName);
+            .update({ selfie: extraData.childSelfie })
+            .eq('responsavel_id', uid);
 
-          if (!existingChildren || existingChildren.length === 0) {
-            let calculatedAge = 0;
-            if (extraData.childBirthdate) {
-              const birth = new Date(extraData.childBirthdate);
-              const today = new Date();
-              calculatedAge = today.getFullYear() - birth.getFullYear();
-              const m = today.getMonth() - birth.getMonth();
-              if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
-                calculatedAge--;
-              }
-            }
-
-            const { error: childError } = await supabase
-              .from('filhos')
-              .insert([
-                {
-                  responsavel_id: data.user.id,
-                  nome: extraData.childName,
-                  idade: calculatedAge,
-                  data_nascimento: extraData.childBirthdate || null,
-                  apelido: extraData.childNickname || '',
-                  neurodivergente: !!extraData.neurodivergente,
-                  neurodivergencia_detalhe: extraData.neurodivergenciaDetalhe || '',
-                  como_acalmar: extraData.comoAcalmar || '',
-                  termo_aceito: !!extraData.termoAceito,
-                  selfie: extraData.childSelfie || null,
-                  data_cadastro: new Date().toISOString()
-                }
-              ]);
-
-            if (childError) {
-              console.error("Erro ao cadastrar filho no signup:", childError.message);
-            }
+          if (childSelfieErr) {
+            console.error("Erro ao salvar selfie da criança em filhos:", childSelfieErr.message);
           }
         }
-      } catch (dbErr) {
-        console.warn("Erro ao rodar fallback no cadastro:", dbErr);
+      } catch (err) {
+        console.warn("Aviso ao salvar anexos adicionais:", err);
       }
     }
 
@@ -344,7 +236,6 @@ export const AuthProvider = ({ children }) => {
     if (error) throw translateSupabaseError(error);
   };
 
-  // Tradutor de erros de autenticação do Supabase
   const translateSupabaseError = (error) => {
     const message = error.message;
     if (message.includes('Invalid login credentials')) {
