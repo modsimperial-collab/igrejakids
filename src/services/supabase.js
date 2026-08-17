@@ -13,7 +13,7 @@ export const subscribeToUserDoc = (uid, callback) => {
   // Busca inicial
   supabase
     .from('usuarios')
-    .select('*')
+    .select('uid, nome, email, tipo_usuario, aprovado, telefone, endereco, membro_igreja, ministerio, nome_igreja, selfie, data_cadastro')
     .eq('uid', uid)
     .maybeSingle()
     .then(({ data, error }) => {
